@@ -1,0 +1,3 @@
+# ComparaTree
+
+ComparaTree is a tool for automatic treebank comparisons of treebanks in the CoNLL-U format. The tool calculates various metrics and generates visualizations that illustrate the similarities and differences between two treebanks. The tool covers a range of linguistic analysis levels: n-gram diversity, part-of-speech and dependency relation proportions, syntactic complexity, and syntactic diversity.
