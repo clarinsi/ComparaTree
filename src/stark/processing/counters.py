@@ -76,7 +76,7 @@ class Counter(object):
         :return:
         """
         for tree, sentence in tqdm(zip(self.document.trees, self.document.sentence_statistics), desc='Processing',
-                                   total=len(self.document.trees)):
+                                   total=len(self.document.trees), disable=True):
             input_data = (tree, self.summary.query_trees, self.filters)
             if self.filters['association_measures']:
                 unigrams = self.get_unigrams((tree, self.filters))

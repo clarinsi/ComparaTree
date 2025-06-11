@@ -30,7 +30,7 @@ import logging
 from tqdm import tqdm
 
 here = path.abspath(path.dirname(__file__))
-logging.basicConfig(level=logging.NOTSET)
+logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger('stark')
 
 
@@ -138,7 +138,7 @@ class Writer(object):
             sorted_list = sorted_list[:self.filters['lines_threshold']]
 
         # body
-        for k, v in tqdm(sorted_list, desc='Writing'):
+        for k, v in tqdm(sorted_list, desc='Writing', disable=True):
             literal_key = v['key']
             word_array = v['word_array']
 

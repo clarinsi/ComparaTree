@@ -17,7 +17,8 @@ from data_structures import ResultContainer, ComparisonConfig
 
 
 # define a function that will calculate the n-gram diversity score.
-def export_ngrams(segment_list, output_dir, mode, n_list, rc: ResultContainer, cc: ComparisonConfig, export_all_ngrams=False, threshold=20):
+def export_ngrams(segment_list, output_dir, mode, n_list, rc: ResultContainer, cc: ComparisonConfig, 
+                  export_all_ngrams=False, threshold=20):
     first_segm_sen_list = list()
     for segm in segment_list:
         # We have to ignore punctuation and other misc. characters here, so that they do not show up within n-grams.

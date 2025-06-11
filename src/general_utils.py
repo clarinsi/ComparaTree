@@ -4,12 +4,14 @@ import matplotlib.pyplot as plt
 from matplotlib_venn import venn2
 from tabulate import tabulate
 import conllu
+import os
 
 from data_structures import ResultContainer
 
 
 # parse conllu files
 def parse_conllu(filepath):
+    print(f"Reading treebank from {os.path.split(filepath)[1]}")
     with open(filepath, "r", encoding="utf-8") as rf:
         parsed_sents = conllu.parse(rf.read())
     
@@ -35,6 +37,9 @@ def split_into_segm(dataset, segment_length):
 # function for drawing histograms. first_data and second_data should be lists of calculated values for the measure for
 # every segment
 def plot_histogram(first_data, second_data, mode, output_dir, rc: ResultContainer, lim_one=False):
+    # manually set matplotlib's logging level due to some strange debug messages
+    plt.set_loglevel("warning")
+
     print(f"Plotting {mode} histogram")
     first_mean = mean(first_data)
     second_mean = mean(second_data)

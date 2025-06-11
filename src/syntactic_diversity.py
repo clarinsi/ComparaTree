@@ -1,11 +1,11 @@
 import os
 from statistics import mean, stdev
-import numpy as np
-import pandas as pd
-import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib_venn import venn2
 from tabulate import tabulate
+from io import StringIO
+from tqdm import tqdm
+import re
 
 #TODO: implement STARK as a library when it becomes available via pip
 from stark.stark import run as stark_run
@@ -23,9 +23,10 @@ from general_utils import plot_histogram
 """
 
 
-def get_tree_diversity(first_segments, second_segments, first_strak_config, second_stark_config, mode, output_dir,
+def get_tree_diversity(first_segments, second_segments, stark_config, mode, output_dir,
                        rc: ResultContainer):
-    print("Making syntactic diversity comparisons")
+    print("Starting tree diversity calculation")
+    print("Starting STARK tree extraction")
     first_tds_list = list()
     second_tds_list = list()
     num_segments_first = len(first_segments)
@@ -57,19 +58,22 @@ def get_tree_diversity(first_segments, second_segments, first_strak_config, seco
             seg_id += 1
 
     # generate stark configs
-    if not os.path.isdir(f"{output_dir}/syntactic_diversity/stark_configs_first"):
-        os.mkdir(f"{output_dir}/syntactic_diversity/stark_configs_first")
-    if not os.path.isdir(f"{output_dir}/syntactic_diversity/stark_configs_second"):
-        os.mkdir(f"{output_dir}/syntactic_diversity/stark_configs_second")
+    #if not os.path.isdir(f"{output_dir}/syntactic_diversity/stark_configs_first"):
+    #    os.mkdir(f"{output_dir}/syntactic_diversity/stark_configs_first")
+    #if not os.path.isdir(f"{output_dir}/syntactic_diversity/stark_configs_second"):
+    #    os.mkdir(f"{output_dir}/syntactic_diversity/stark_configs_second")
     if not os.path.isdir(f"{output_dir}/syntactic_diversity/stark_trees_first"):
         os.mkdir(f"{output_dir}/syntactic_diversity/stark_trees_first")
     if not os.path.isdir(f"{output_dir}/syntactic_diversity/stark_trees_second"):
         os.mkdir(f"{output_dir}/syntactic_diversity/stark_trees_second")
 
-    with open(first_strak_config, "r", encoding="utf-8") as rf_config:
+    # right now only a single config is supported, not sure if having separate stark configs 
+    # for each treebank would serve any purpose
+    with open(stark_config, "r", encoding="utf-8") as rf_config:
         base_config = rf_config.read()
 
-    # write the configs
+    """
+    # Uncomment this (and make a few adjustments) to write to files
     for seg_id in range(num_segments_first):
         with open(f"{output_dir}/syntactic_diversity/stark_configs_first/config_{str(seg_id + 1)}.ini", "w",
                   encoding="utf-8") as wf_config:
@@ -84,14 +88,21 @@ def get_tree_diversity(first_segments, second_segments, first_strak_config, seco
             wf_config.write(base_config.replace("input = ../Datasets/SSJ-UD_v2.15/ssj_merged.conllu",
                                                 f"input = {output_dir}/syntactic_diversity/conllu/second/segment_{str(seg_id + 1)}.conllu").replace(
                                                 "output = Analysis_2_SSJ_vs_SST/stark_results/SSJ_output.tsv",
-                                                f"output = {output_dir}/syntactic_diversity/stark_trees_second/segment_{str(seg_id + 1)}.txt"))
+                                                f"output = {output_dir}/syntactic_diversity/stark_trees_second/segment_{str(seg_id + 1)}.txt"))"""
 
     # run stark
-    for seg_id in range(num_segments_first):
-        stark_run(stark_read_settings(f"{output_dir}/syntactic_diversity/stark_configs_first/config_{str(seg_id + 1)}.ini"))
+    for seg_id in tqdm(range(num_segments_first), desc="Exporting trees for the first treebank"):
+        # first build the config
+        config_file = re.sub(r"input = .*\n", f"input = {output_dir}/syntactic_diversity/conllu/first/segment_{str(seg_id + 1)}.conllu\n", base_config)
+        config_file = re.sub(r"output = .*\n", f"output = {output_dir}/syntactic_diversity/stark_trees_first/segment_{str(seg_id + 1)}.txt\n", config_file)
 
-    for seg_id in range(num_segments_second):
-        stark_run(stark_read_settings(f"{output_dir}/syntactic_diversity/stark_configs_second/config_{str(seg_id + 1)}.ini"))
+        stark_run(stark_read_settings(StringIO(config_file)))
+
+    for seg_id in tqdm(range(num_segments_second), desc="Exporting trees for the second treebank"):
+        config_file = re.sub(r"input = .*\n", f"input = {output_dir}/syntactic_diversity/conllu/second/segment_{str(seg_id + 1)}.conllu\n", base_config)
+        config_file = re.sub(r"output = .*\n", f"output = {output_dir}/syntactic_diversity/stark_trees_second/segment_{str(seg_id + 1)}.txt\n", config_file)
+
+        stark_run(stark_read_settings(StringIO(config_file)))
 
     # calculate the tds for each treebank
     for seg_id in range(num_segments_first):

@@ -29,7 +29,7 @@ from stark.processing.processor import Processor
 from stark.processing.query_trees import generate_query_trees, get_query_tree_size_range
 from stark.processing.writers import TSVWriter, ObjectWriter
 
-logging.basicConfig(level=logging.NOTSET)
+logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger('stark')
 
 sys.setrecursionlimit(25000)
@@ -260,7 +260,7 @@ def read_settings(config_file, args=EmptyNamespace()):
     :return:
     """
     config = configparser.ConfigParser()
-    config.read(config_file)
+    config.read_file(config_file)
 
     return read_configs(config, args)
 
