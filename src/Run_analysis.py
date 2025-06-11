@@ -91,23 +91,6 @@ if __name__ == "__main__":
         get_tree_diversity(first_segments, second_segments, comparison_config.stark_config_file,
                         "Tree Diversity Score", comparison_config.output_dir, result_container)
 
-    #TODO: only output those html fields that pertain to the user's selected analysis levels
+    # TODO: only output those html sections that correspond to the user's selected analysis levels
     # summarize the results
     write_html_summary(comparison_config.output_dir, result_container)
-
-    """
-    # draw the n-gram frequency visualisation stripplots
-    draw_stripplot(first_ngram_frequencies, second_ngram_frequencies, output_dir, ngrams_n_list, result_container)
-
-    # draw the rank-frequency distribution plot
-    for n in ngrams_n_list:
-        draw_rankfreq(first_ngram_frequencies, second_ngram_frequencies, output_dir, n, result_container)
-
-    # calculate the intersection of both sets of trees and the number of unique trees that appear only in one of the two
-    # corpora as well as the syntactic tree diversity scores (STD - # of unique trees / total # of trees)
-    # TODO: here you have to include the paths to the files as they appear in the STARK config
-    compare_unique_trees(f"{output_dir}/stark_results/{result_container.dataset_names[0]}_output.tsv",
-                        f"{output_dir}/stark_results/{result_container.dataset_names[1]}_output.tsv",
-                        output_dir, result_container)
-    """
-
