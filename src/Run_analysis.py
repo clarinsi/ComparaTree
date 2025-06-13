@@ -21,19 +21,19 @@ def parse_args():
     argparser.add_argument("--analysis_levels", type=str, default="bs,ld,tp,sc",
                            help="List of levels of linguistic analysis that the comparison will be performed on. Separate the values by commas, as such: bs,ld,tp,sc " \
                            "The abbreviations are as follows: bs – basic level, ld – lexical diversity, tp – tag proportions, sc - syntactic complexity, nd – n-gram diversity, sd – syntactic diversity. " \
-                           "Pass in 'full' as one of the values for a full analysis")
+                           "Pass in 'full' as one of the values for a full analysis.")
     argparser.add_argument("--segment_length", type=int, default=1000,
-                           help="Length of segments in number of sentences that the input treebanks will be split into. Defaults to 1000.")
+                           help="Length of segments in number of tokens that the input treebanks will be split into. Defaults to 1000.")
     argparser.add_argument("--first_treebank_name", type=str, default=None,
-                           help="The name of the first treebank. Defaults to the filename of the first dataset")
+                           help="The name to be used for the first treebank. Defaults to the file name of the first dataset.")
     argparser.add_argument("--second_treebank_name", type=str, default=None,
-                           help="The name of the second treebank. Defaults to the filename of the second dataset")
+                           help="The name to be used for the second treebank. Defaults to the file name of the second dataset.")
     argparser.add_argument("--stark_config", type=str, default="example_stark_config.ini",
-                           help="STARK config file for the tree extraction process.")
+                           help="STARK config file used in the tree extraction process.")
     argparser.add_argument("--n_grams_n_list", type=str, default="3",
-                           help="List of values of n for n-gram-based calculations. Separate the values by commas, as such: 3,4,5")
+                           help="List of values of n for n-gram-based calculations. Separate the values by commas, as such: '3,4,5'.")
     argparser.add_argument("--export_n_grams", action="store_true", 
-                           help="Enables exporting n-gram frequencies for every segment. Warning, this can result in very large files!!")
+                           help="Enables exporting n-gram frequencies for every segment. Warning, this can result in very large output files!!")
     
     return argparser.parse_args()
 
