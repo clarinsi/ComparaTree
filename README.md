@@ -28,7 +28,7 @@ Other configuration options that can be used when running the command described 
 
 * `--analysis_levels`: List of levels of linguistic analysis that the comparison will be performed on. Separate the values by commas, as such: 'bs,ld,tp,sc'. The abbreviations are as follows: bs – basic level, ld – lexical diversity, tp – tag proportions, sc - syntactic complexity, nd – n-gram diversity, sd – syntactic diversity. Pass in 'full' as one of the values for a full analysis. Defaults to 'bs,ld,tp,sc'.
 
-NOTE: The syntactic diversity measure calculations currently incorporate the external [STARK](https://github.com/clarinsi/STARK) tool for dependency tree extraction. The process can be resource intensive and time consuming when generating comparisons for large treebank. It is recommended that you set the segment length (see below) to at least 1000 (or more) when incorporating syntactic diversity comparisons for large treebanks.
+NOTE: The syntactic diversity measure calculations currently incorporate the external [STARK](https://github.com/clarinsi/STARK) tool for dependency tree extraction. The process can be resource intensive and time consuming when generating comparisons for large treebanks. It is recommended that you set the segment length (see below) to at least 1000 (or more) when incorporating syntactic diversity comparisons for large treebanks.
 
 * `--segment_length`: Length of segments (in number of tokens) that the input treebanks will be split into. The segments are used in calculating lexical diversity, n-gram diversity, and syntactic diversity measures. Defaults to 1000.
 
@@ -38,6 +38,6 @@ NOTE: The syntactic diversity measure calculations currently incorporate the ext
 
 * `--stark_config`: STARK config file used in the tree extraction process.
 
-* `--n_grams_n_list`: List of values of n for n-gram-based calculations. Separate the values by commas, as such: '3,4,5'.
+* `--n_grams_n_list`: List of values of n for n-gram-based calculations. Separate the values by commas, as such: '3,4,5'. Defaults to '3'.
 
 * `--export_n_grams`: Enables exporting n-gram frequencies for every segment. Warning, this can result in very large output files!!

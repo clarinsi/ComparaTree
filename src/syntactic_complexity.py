@@ -19,6 +19,10 @@ from data_structures import ResultContainer
 def mdd(sentence):
     list_of_dd = list()
     for tok in sentence:
+        # skip multi-word tokens
+        if not isinstance(tok["id"], int):
+            continue
+         
         if tok["deprel"] not in ["punct", "root"]:
             list_of_dd.append(abs(int(tok["id"]) - int(tok["head"])))
 

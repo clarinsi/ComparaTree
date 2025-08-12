@@ -92,7 +92,7 @@ def export_ngrams(segment_list, output_dir, mode, n_list, rc: ResultContainer, c
 
             # calculate the mean and standard deviation for this n and store the results
             mean_ngd = mean(ngd_dict[n])
-            stdev_ngd = stdev(ngd_dict[n])
+            stdev_ngd = stdev(ngd_dict[n]) if len(ngd_dict[n]) > 1 else None
             wf_summary.write(f"{n}\t{mean_ngd}\n")
             if mode == "first":
                 """rc.mean_rf_first[n] = mean_rel_freq

@@ -75,8 +75,8 @@ def export_lexical_diversity_measures(first_segments, second_segments, output_di
         rc.mean_ttr = [mean_f_ttr, mean_s_ttr]
 
         # calculate the standard deviation of the ttr score
-        stdev_f_ttr = stdev(f_ttr_l)
-        stdev_s_ttr = stdev(s_ttr_l)
+        stdev_f_ttr = stdev(f_ttr_l) if len(f_ttr_l) > 1 else None
+        stdev_s_ttr = stdev(s_ttr_l) if len(s_ttr_l) > 1 else None
         wf_ld.write("\t".join(["STD. DEV. TTR", str(stdev_f_ttr), str(stdev_s_ttr)]) + "\n")
         rc.stdev_ttr = [stdev_f_ttr, stdev_s_ttr]
 

@@ -2,7 +2,7 @@ import os
 from argparse import ArgumentParser
 
 from data_structures import ResultContainer, ComparisonConfig
-from general_utils import split_into_segm, basic_stats, plot_histogram, write_html_summary, parse_conllu
+from general_utils import split_into_segm, basic_stats, plot_histogram, write_html_summary, parse_conllu, format_results
 from lexical_measures import export_lexical_diversity_measures
 from tag_proportions import export_tag_proportions
 from syntactic_complexity import export_syntactic_complexity_measure
@@ -49,6 +49,10 @@ if __name__ == "__main__":
 
     # prepare the ResultContainer
     result_container = ResultContainer()
+
+    # set dataset names
+    if comparison_config.first_dataset_name == comparison_config.second_dataset_name:
+        raise Exception("Both datasets currently have the same name, please manually set the dataset names using --first_treebank_name and --second_treebank_name")
     result_container.dataset_names = [comparison_config.first_dataset_name, comparison_config.second_dataset_name]
 
     # read the annotated files
@@ -90,6 +94,9 @@ if __name__ == "__main__":
         # run stark for both datasets and obtain the TDS metric for every segment
         get_tree_diversity(first_segments, second_segments, comparison_config.stark_config_file,
                         "Tree Diversity Score", comparison_config.output_dir, result_container)
+
+    # format numeric values in result
+    format_results(result_container)
 
     # TODO: only output those html sections that correspond to the user's selected analysis levels
     # summarize the results

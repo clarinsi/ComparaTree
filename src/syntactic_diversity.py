@@ -1,4 +1,7 @@
 import os
+from pathlib import PureWindowsPath
+import configparser
+import logging
 from statistics import mean, stdev
 import matplotlib.pyplot as plt
 from matplotlib_venn import venn2
@@ -7,10 +10,8 @@ from io import StringIO
 from tqdm import tqdm
 import re
 
-#TODO: implement STARK as a library when it becomes available via pip
 from stark.stark import run as stark_run
-from stark.stark import read_settings as stark_read_settings
-from stark.stark import parse_args as stark_parse_args
+from stark.stark import read_configs as stark_read_configs
 
 from data_structures import ResultContainer
 from general_utils import plot_histogram
@@ -93,16 +94,30 @@ def get_tree_diversity(first_segments, second_segments, stark_config, mode, outp
     # run stark
     for seg_id in tqdm(range(num_segments_first), desc="Exporting trees for the first treebank"):
         # first build the config
-        config_file = re.sub(r"input = .*\n", f"input = {output_dir}/syntactic_diversity/conllu/first/segment_{str(seg_id + 1)}.conllu\n", base_config)
-        config_file = re.sub(r"output = .*\n", f"output = {output_dir}/syntactic_diversity/stark_trees_first/segment_{str(seg_id + 1)}.txt\n", config_file)
+        input_string = "input = " + PureWindowsPath(os.path.join(output_dir, "syntactic_diversity", "conllu", "first", f"segment_{str(seg_id + 1)}.conllu\n")).as_posix()
+        output_string = "output = " + PureWindowsPath(os.path.join(output_dir, "syntactic_diversity", "stark_trees_first", f"segment_{str(seg_id + 1)}.txt\n")).as_posix()
+        config_file = re.sub(r"input = .*\n", input_string, base_config)
+        config_file = re.sub(r"output = .*\n", output_string, config_file)
 
-        stark_run(stark_read_settings(StringIO(config_file)))
+        stark_config = configparser.ConfigParser()
+        stark_config.read_file(StringIO(config_file))
+
+        # suppress STARK's logging output
+        logging.getLogger('stark').setLevel(logging.WARNING)
+        stark_run(stark_read_configs(stark_config))
 
     for seg_id in tqdm(range(num_segments_second), desc="Exporting trees for the second treebank"):
-        config_file = re.sub(r"input = .*\n", f"input = {output_dir}/syntactic_diversity/conllu/second/segment_{str(seg_id + 1)}.conllu\n", base_config)
-        config_file = re.sub(r"output = .*\n", f"output = {output_dir}/syntactic_diversity/stark_trees_second/segment_{str(seg_id + 1)}.txt\n", config_file)
+        input_string = "input = " + PureWindowsPath(os.path.join(output_dir, "syntactic_diversity", "conllu", "second", f"segment_{str(seg_id + 1)}.conllu\n")).as_posix()
+        output_string = "output = " + PureWindowsPath(os.path.join(output_dir, "syntactic_diversity", "stark_trees_second", f"segment_{str(seg_id + 1)}.txt\n")).as_posix()
+        config_file = re.sub(r"input = .*\n", input_string, base_config)
+        config_file = re.sub(r"output = .*\n", output_string, config_file)
 
-        stark_run(stark_read_settings(StringIO(config_file)))
+        stark_config = configparser.ConfigParser()
+        stark_config.read_file(StringIO(config_file))
+
+        # suppress STARK's logging output
+        logging.getLogger('stark').setLevel(logging.WARNING)
+        stark_run(stark_read_configs(stark_config))
 
     # calculate the tds for each treebank
     for seg_id in range(num_segments_first):
@@ -137,7 +152,11 @@ def get_tree_diversity(first_segments, second_segments, stark_config, mode, outp
 
     # store the mean and standard deviation of the TDS for each treebank and draw a histogram
     rc.tree_diversity_score = [mean(first_tds_list), mean(second_tds_list)]
-    rc.stdev_tree_diversity_score = [stdev(first_tds_list), stdev(second_tds_list)]
+    
+    first_stdev = stdev(first_tds_list) if len(first_tds_list) > 1 else None
+    second_stdev = stdev(second_tds_list) if len(second_tds_list) > 1 else None
+    rc.stdev_tree_diversity_score = [first_stdev, second_stdev]
+
     plot_histogram(first_tds_list, second_tds_list, "Tree Diversity Score", output_dir, rc)
 
 
