@@ -41,3 +41,27 @@ NOTE: The syntactic diversity measure calculations currently incorporate the ext
 * `--n_grams_n_list`: List of values of n for n-gram-based calculations. Separate the values by commas, as such: '3,4,5'. Defaults to '3'.
 
 * `--export_n_grams`: Enables exporting n-gram frequencies for every segment. Warning, this can result in very large output files!!
+
+## Citation
+
+Please cite ComparaTree using the following:
+
+```
+@inproceedings{tercon-dobrovoljc-2025-comparatree,
+    title = "{C}ompara{T}ree: A Multi-Level Comparative Treebank Analysis Tool",
+    author = "Ter{\v{c}}on, Luka  and
+      Dobrovoljc, Kaja",
+    editor = {Jablotschkin, Sarah  and
+      K{\"u}bler, Sandra  and
+      Zinsmeister, Heike},
+    booktitle = "Proceedings of the 23rd International Workshop on Treebanks and Linguistic Theories (TLT, SyntaxFest 2025)",
+    month = aug,
+    year = "2025",
+    address = "Ljubljana, Slovenia",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2025.tlt-1.15/",
+    pages = "129--139",
+    ISBN = "979-8-89176-291-6",
+    abstract = "ComparaTree is a tool for comparative treebank analysis that combines various methods of quantitative linguistic analysis to provide a general overview of the differences and similarities between two treebanks. The comparison tool covers a range of subfields of linguistic analysis, providing a summary of the differences and similarities in terms of the lexical diversity, n-gram diversity, part-of-speech and dependency relation proportions, syntactic complexity, and syntactic diversity. We explain the various quantitative analyses performed on every level along with the generation of graphical visualizations, which add value by enabling user-friendly comparisons at a glance. We exemplify the comparison process by presenting the results produced by the tool when comparing two treebanks from the Universal Dependencies collection."
+}
+```
