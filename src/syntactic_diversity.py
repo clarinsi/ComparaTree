@@ -25,7 +25,7 @@ from general_utils import plot_histogram
 
 
 def get_tree_diversity(first_segments, second_segments, stark_config, mode, output_dir,
-                       rc: ResultContainer):
+                       rc: ResultContainer, segmentation_mode):
     print("Starting tree diversity calculation")
     print("Starting STARK tree extraction")
     first_tds_list = list()
@@ -157,7 +157,7 @@ def get_tree_diversity(first_segments, second_segments, stark_config, mode, outp
     second_stdev = stdev(second_tds_list) if len(second_tds_list) > 1 else None
     rc.stdev_tree_diversity_score = [first_stdev, second_stdev]
 
-    plot_histogram(first_tds_list, second_tds_list, "Tree Diversity Score", output_dir, rc)
+    plot_histogram(first_tds_list, second_tds_list, "Tree Diversity Score", output_dir, rc, segmentation_mode=segmentation_mode)
 
 
 def compare_unique_trees(first_trees_file, second_trees_file, output_dir, rc: ResultContainer):

@@ -22,8 +22,8 @@ def export_ngrams(segment_list, output_dir, mode, n_list, rc: ResultContainer, c
     first_segm_sen_list = list()
     for segm in segment_list:
         # We have to ignore punctuation and other misc. characters here, so that they do not show up within n-grams.
-        first_segm_sen_list.append([[token["form"].lower() for token in sent if token["form"] not in cc.ngrams_ignore] for
-                                    sent in segm])
+        curr_segm_sents = [[token["form"].lower() for token in sent if token["form"] not in cc.ngrams_ignore] for sent in segm]
+        first_segm_sen_list.append(curr_segm_sents)
     
     ngd_dict = defaultdict(list)
 
@@ -70,7 +70,7 @@ def export_ngrams(segment_list, output_dir, mode, n_list, rc: ResultContainer, c
 
                 # count the total number of n-grams in the segment and then calculate the NGD (N-gram Diversity Score)
                 frequencies_sum = sum(segment_frequencies.values())
-                ngd = len(segment_frequencies.keys()) / frequencies_sum
+                ngd = len(segment_frequencies.keys()) / frequencies_sum if frequencies_sum > 0 else 0 # not the best solution for empty segments, but should temporarily work fine
                 ngd_dict[n].append(ngd)
 
                 if export_all_ngrams:

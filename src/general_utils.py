@@ -1,5 +1,6 @@
 from statistics import mean, stdev, median
 import seaborn as sns
+import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib_venn import venn2
 from tabulate import tabulate
@@ -19,37 +20,74 @@ def parse_conllu(filepath):
     return parsed_sents
 
 
-# basic segmentation of the treebanks
-def split_into_segm(dataset, segment_length):
+# basic segmentation of the treebanks. There are three segmentation modes:
+# 1. the "n" mode is the default mode. It splits the treebank into approximately equally sized segments of n tokens.
+# 2. the "doc_from_newdoc" mode splits the treebank into documents and tries to infer document boundaries from the "newdoc id" comment 
+# 3. the "doc_from_id" mode splits the treebank into documents and tries to infer document boundaries from the sentence id (the assumption is that sentence ids are of the format "doc3022.27.7", where "doc3022" denotes the document id).
+def split_into_segm(dataset, segmentation_mode, segment_length=1000):
+    assert segmentation_mode in ["n", "doc_from_newdoc", "doc_from_id"]
     segments = list()
-    curr_segment = list()
-    i = 0
-    for sent in dataset:
-        i += len(sent)
-        curr_segment.append(sent)
-        if i > segment_length:
+
+    if segmentation_mode == "n":
+        curr_segment = list()
+        i = 0
+        for sent in dataset:
+            i += len(sent)
+            curr_segment.append(sent)
+            if i > segment_length:
+                segments.append(curr_segment)
+                curr_segment = list()
+                i = 0
+        
+        if len(curr_segment) > 0:
             segments.append(curr_segment)
-            curr_segment = list()
-            i = 0
+
+    elif segmentation_mode == "doc_from_newdoc":
+        curr_segment = list()
+        for sent in dataset:
+            if "newdoc_id" in sent.metadata.keys() and len(segments) > 0:
+                segments.append(curr_segment)
+                curr_segment = list()
+            curr_segment.append(sent)
+        
+        if len(curr_segment) > 0:
+            segments.append(curr_segment)
     
-    if len(curr_segment) > 0:
-        segments.append(curr_segment)
+    elif segmentation_mode == "doc_from_id":
+        curr_segment = list()
+        old_doc = None
+        curr_doc = None
+        for sent in dataset:
+            assert "." in sent.metadata["sent_id"]
+
+            curr_doc = sent.metadata["sent_id"].split(".")[0]
+            if not old_doc:
+                old_doc = curr_doc
+            if curr_doc != old_doc:
+                segments.append(curr_segment)
+                curr_segment = list()
+                old_doc = curr_doc
+            curr_segment.append(sent)
+        
+        if len(curr_segment) > 0:
+            segments.append(curr_segment)
 
     return segments
 
 
 # function for drawing histograms. first_data and second_data should be lists of calculated values for the measure for
 # every segment
-def plot_histogram(first_data, second_data, mode, output_dir, rc: ResultContainer, lim_one=False):
+def plot_histogram(first_data, second_data, measure, output_dir, rc: ResultContainer, lim_one=False, segmentation_mode="n"):
+
     # manually set matplotlib's logging level due to some strange debug messages
     plt.set_loglevel("warning")
     logging.getLogger('PIL').setLevel(logging.WARNING)
 
-    print(f"Plotting {mode} histogram")
-    first_mean = mean(first_data)
-    second_mean = mean(second_data)
-    first_stdev = stdev(first_data) if len(first_data) > 1 else None
-    second_stdev = stdev(second_data) if len(second_data) > 1 else None
+    print(f"Plotting {measure} histogram")
+    first_mean = mean([x for x in first_data if x is not np.nan])
+    second_mean = mean([x for x in second_data if x is not np.nan])
+    first_stdev = stdev([x for x in first_data if x is not np.nan]) if len(first_data) > 1 else None
+    second_stdev = stdev([x for x in second_data if x is not np.nan]) if len(second_data) > 1 else None
 
     # make histograms
     fig, axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
@@ -57,7 +95,7 @@ def plot_histogram(first_data, second_data, mode, output_dir, rc: ResultContaine
     # Plot the first histogram
     sns.histplot(first_data, kde=False, ax=axes[0])
     axes[0].set_title(f"Treebank={rc.dataset_names[0]}")
-    axes[0].set(xlabel=f"Range of values for {mode}")
+    axes[0].set(xlabel=f"Range of values for {measure}")
     if lim_one:
         axes[0].set_xlim(0, 1)
     axes[0].axvline(x=first_mean, color='red', linestyle='-', linewidth=2)
@@ -73,7 +111,7 @@ def plot_histogram(first_data, second_data, mode, output_dir, rc: ResultContaine
     # Plot the second histogram
     sns.histplot(second_data, kde=False, ax=axes[1])
     axes[1].set_title(f"Treebank={rc.dataset_names[1]}")
-    axes[1].set(xlabel=f"Range of values for {mode}")
+    axes[1].set(xlabel=f"Range of values for {measure}")
     if lim_one:
         axes[1].set_xlim(0, 1)
     axes[1].axvline(x=second_mean, color='red', linestyle='-', linewidth=2)
@@ -86,28 +124,27 @@ def plot_histogram(first_data, second_data, mode, output_dir, rc: ResultContaine
         axes[1].text(0.95, 0.80, f"Standard deviation = N/A", color='orange', fontsize=14, ha='right',
                      va='top', transform=axes[1].transAxes)
 
-    if mode == "Average Sentence Length":
-        fig.suptitle(f"{mode} Histogram")
+    # handle segmentation mode wording
+    if segmentation_mode == "n":
+        segmentation_mode_wording = "Per-Segment"
     else:
-        fig.suptitle(f"Segmental {mode} Histogram")
+        segmentation_mode_wording = "Per-Document"
+
+    if measure == "Segment Length":
+        segmentation_mode_wording = "" # Special case
 
     # set the title and add a caption
+    fig.suptitle(f"{segmentation_mode_wording} {measure} Histogram")
+
     plt.tight_layout()
     fig.subplots_adjust(bottom=0.14)
-    if mode == "Average Sentence Length":
-        caption = (r"$\bf{Figure:}$" + f"Histogram showing the frequency distribution for the sentence length in "
-                                       f"number of tokens for both treebanks. The x axis represents the range of "
-                                       f"values for the sentence lengths. The blue bars represent the number of "
-                                       f"observations for each value "
-                                       f"of the measure. The red vertical line represents the mean of the {mode}.")
-    else:
-        caption = (r"$\bf{Figure:}$" + f"Histogram showing the frequency distribution for the per-segment "
-                   f"{mode} in both treebanks. The x axis represents the range of values for the {mode}. "
-                   f"The blue bars represent the number of observations for each value "
-                   f"of the measure. The red vertical line represents the mean of the {mode}.")
+    caption = (r"$\bf{Figure:}$" + f"Histogram showing the frequency distribution for the {segmentation_mode_wording.lower()} "
+                f"{measure} in both treebanks. The x axis represents the range of values for the {measure}. "
+                f"The blue bars represent the number of observations for each value "
+                f"of the measure. The red vertical line represents the mean of the {measure}.")
     fig.text(0, 0.01, caption, wrap=True, fontsize=10)
 
-    plt.savefig(f"{output_dir}/{mode}_histogram.png")
+    plt.savefig(f"{output_dir}/{measure}_histogram.png")
 
 
 # output the basic statistics for a dataset composed of sentences in the conllu format
@@ -142,6 +179,59 @@ def basic_stats(first_dataset, second_dataset, output_dir, rc: ResultContainer):
     rc.stdevwords = [first_stdev_words, second_stdev_words]
 
     plot_histogram(first_wps, second_wps, "Average Sentence Length", output_dir, rc)
+
+
+# tweaked version of the basic statistics calculation function which works with segments
+def basic_stats_segments(first_segments, second_segments, output_dir, rc: ResultContainer, segmentation_mode="n"):
+    print("Calculating basic statistics")
+    first_total_words = len([word for first_seg in first_segments for sent in first_seg for word in sent])
+    first_total_sents = len([sent for first_seg in first_segments for sent in first_seg])
+    first_total_segs = len(first_segments)
+
+    second_total_words = len([word for second_seg in second_segments for sent in second_seg for word in sent])
+    second_total_sents = len([sent for second_seg in second_segments for sent in second_seg])
+    second_total_segs = len(second_segments)
+
+    # mean number of words per sentence averaged over segments
+    first_seg_lengths = [[len(sent) for sent in first_seg] for first_seg in first_segments]
+    second_seg_lengths = [[len(sent) for sent in second_seg] for second_seg in second_segments]
+    first_seg_mean_words = [mean(seg_lengths) for seg_lengths in first_seg_lengths]
+    second_seg_mean_words = [mean(seg_lengths) for seg_lengths in second_seg_lengths]
+
+    # overall segment lengths
+    first_overall_seg_lengths = [sum(seg_lengths) for seg_lengths in first_seg_lengths]
+    second_overall_seg_lengths = [sum(seg_lengths) for seg_lengths in second_seg_lengths]
+
+    # mean number of words per sentence for each treebank in full
+    first_wps = [length for seg_lengths in first_seg_lengths for length in seg_lengths]
+    second_wps = [length for seg_lengths in second_seg_lengths for length in seg_lengths]
+
+    first_mean_words = mean(first_wps)
+    second_mean_words = mean(second_wps)
+
+    first_stdev_words = stdev(first_wps)
+    second_stdev_words = stdev(second_wps)
+
+    basic_stats_table = "---------------\nBasic statistics for the two datasets:\n---------------\n\n" + tabulate(
+        [["First", first_total_words, first_total_sents, first_total_segs, first_mean_words, first_stdev_words],
+         ["Second", second_total_words, second_total_sents, second_total_segs, second_mean_words, second_stdev_words]],
+        headers=["Dataset", "Words total", "Sentences total", "Segments total", "Mean words per sentence", "Stdev words per sentence"], intfmt=",", tablefmt="rounded_outline") + "\n---------------\n\n"
+    with open(f"{output_dir}/basic_stats.txt", "w", encoding="utf-8") as wf_basic:
+        wf_basic.write(basic_stats_table)
+
+    rc.words = [first_total_words, second_total_words]
+    rc.sents = [first_total_sents, second_total_sents]
+    rc.meanwords = [first_mean_words, second_mean_words]
+    rc.stdevwords = [first_stdev_words, second_stdev_words]
+
+    # visualization of overall segment length
+    plot_histogram(first_overall_seg_lengths, second_overall_seg_lengths, "Segment Length", output_dir, rc, segmentation_mode=segmentation_mode)
+
+    # segment level visualization of mean sentence length
+    plot_histogram(first_seg_mean_words, second_seg_mean_words, "Average Sentence Length", output_dir, rc, segmentation_mode=segmentation_mode)
+
+    # sentence level visualization of mean sentence length
+    #plot_histogram(first_wps, second_wps, "Average Sentence Length", output_dir, rc)
 
 
 """
@@ -334,6 +424,7 @@ def write_html_summary(output_dir, rc: ResultContainer):
         <div>
             <h3>Basic</h3>
                 <img src="Average Sentence Length_histogram.png"><br>
+                <img style="margin-top: 40pt" src="Segment Length_histogram.png"><br>
         </div>
         <div>
             <h3>Lexical Diversity</h3>
@@ -350,8 +441,8 @@ def write_html_summary(output_dir, rc: ResultContainer):
         </div>
         <div>
             <h3 style="margin-top: 40pt">Syntactic Complexity</h3>
-                <img src="syntactic_complexity_mdd_histogram.png"><br>
-                <img style="margin-top: 40pt" src="syntactic_complexity_ndd_histogram.png"><br>
+                <img src="Mean Dependency Distance_histogram.png"><br>
+                <img style="margin-top: 40pt" src="Normalized Dependency Distance_histogram.png"><br>
         </div>
         <div>
             <h3 style="margin-top: 40pt">Syntactic Diversity</h3>

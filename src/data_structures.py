@@ -60,6 +60,9 @@ class ComparisonConfig:
         # output directory
         self.output_dir = os.path.normpath(args["output_dir"])
 
+        # segmentation mode
+        self.segmentation_mode = args["segmentation_mode"]
+
         # length of segments that the treebank will be split into
         self.segment_length = args["segment_length"]
 
@@ -80,13 +83,13 @@ class ComparisonConfig:
         
         # first treebank name
         if not args["first_treebank_name"]:
-            self.first_dataset_name = os.path.split(self.first_file)[1].split(".")[0]
+            self.first_dataset_name = ".".join(os.path.split(self.first_file)[1].split(".")[:-1])
         else:
             self.first_dataset_name = args["first_treebank_name"]
         
         # second treebank name
         if not args["second_treebank_name"]:
-            self.second_dataset_name = os.path.split(self.second_file)[1].split(".")[0]
+            self.second_dataset_name = ".".join(os.path.split(self.second_file)[1].split(".")[:-1])
         else:
             self.second_dataset_name = args["second_treebank_name"]
 

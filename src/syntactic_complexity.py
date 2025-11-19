@@ -7,6 +7,7 @@ from statistics import mean, stdev, median
 from math import log, sqrt, ceil
 
 from data_structures import ResultContainer
+from general_utils import plot_histogram
 
 
 """
@@ -51,58 +52,21 @@ def ndd(sentence, sent_mdd):
 
 
 # main function to make the syntactic complexity calculation
-def export_syntactic_complexity_measure(first_dataset: list, second_dataset: list, output_dir, rc: ResultContainer):
-    def draw_sc_histogram(first_data, second_data, first_mean, second_mean, mode):
-        mode = mode.lower()
-        if mode == "mdd":
-            mode_full = "Mean Dependency Distance"
-        else:
-            mode_full = "Normalized Dependency Distance"
-
-        # draw histogram
-        fig, axes = plt.subplots(2, 1, figsize=(10, 6), sharex=True)
-
-        sns.histplot(first_data, kde=False, ax=axes[0])
-        axes[0].set_title(f"Treebank={rc.dataset_names[0]}")
-        axes[0].set(xlabel=f"Range of values for {mode_full}")
-        axes[0].axvline(x=first_mean, color='red', linestyle='-', linewidth=2)
-        axes[0].text(0.95, 0.95, f"Mean = {first_mean:.3f}", color='red', fontsize=14, ha='right', va='top',
-                     transform=axes[0].transAxes)
-        axes[0].text(0.95, 0.80, f"Standard deviation = {stdev([x for x in first_data if x is not np.nan]):.3f}",
-                     color='orange', fontsize=14, ha='right', va='top', transform=axes[0].transAxes)
-
-        sns.histplot(second_data, kde=False, ax=axes[1])
-        axes[1].set_title(f"Treebank={rc.dataset_names[1]}")
-        axes[1].set(xlabel=f"Range of values for {mode_full}")
-        axes[1].axvline(x=second_mean, color='red', linestyle='-', linewidth=2)
-        axes[1].text(0.95, 0.95, f"Mean = {second_mean:.3f}", color='red', fontsize=14, ha='right', va='top',
-                     transform=axes[1].transAxes)
-        axes[1].text(0.95, 0.80, f"Standard deviation = {stdev([x for x in second_data if x is not np.nan]):.3f}",
-                     color='orange', fontsize=14, ha='right', va='top', transform=axes[1].transAxes)
-
-        fig.suptitle(f"{mode_full} Histogram")
-
-        plt.tight_layout()
-        fig.subplots_adjust(bottom=0.14)
-        caption = (r"$\bf{Figure:}$" + f"Histogram showing the frequency distribution for {mode_full} in both "
-                   f"treebanks. The blue bars represent the number of observations for each value of the measure. The "
-                   f"red vertical line represents the mean of the {mode_full}.")
-        fig.text(0, 0.01, caption, wrap=True, fontsize=10)
-
-        plt.savefig(f"{output_dir}/syntactic_complexity_{mode}_histogram.png")
-
+def export_syntactic_complexity_measure(first_segments: list, second_segments: list, output_dir, rc: ResultContainer, segmentation_mode):
     print(f"Calculating syntactic complexity (MDD and NDD)")
+
     with open(f"{output_dir}/syntactic_complexity.tsv", "w", encoding="utf-8") as wf_sc:
         sc_measurements = defaultdict(list)
-        for dataset in [first_dataset, second_dataset]:
-            # TODO: This should output dataset names as given in the config
+        sc_segment_measurements = defaultdict(list)
+
+        for dataset in [first_segments, second_segments]:
             # introduce dataset and write header
-            if dataset == first_dataset:
+            if dataset == first_segments:
                 wf_sc.write(f"=============================================\n"
                             f"{rc.dataset_names[0]} SYNTACTIC COMPLEXITY MEASURES:\n"
                             f"=============================================\n\n")
                 wf_sc.write("\t".join(["SENT_ID", "MDD", "NDD"]) + "\n")
-            if dataset == second_dataset:
+            if dataset == second_segments:
                 wf_sc.write(f"\n=============================================\n"
                             f"{rc.dataset_names[1]} SYNTACTIC COMPLEXITY MEASURES:\n"
                             f"=============================================\n\n")
@@ -110,21 +74,42 @@ def export_syntactic_complexity_measure(first_dataset: list, second_dataset: lis
 
             # calculate sc measures
             i = 0
-            for sent in dataset:
-                i += 1
-                sent_mdd = mdd(sent)
-                sent_ndd = ndd(sent, sent_mdd)
-                if dataset == first_dataset:
-                    sc_measurements["first_mdd"].append(sent_mdd)
-                    sc_measurements["first_ndd"].append(sent_ndd)
+            for segment in dataset:
+                curr_segment_mdd_measurements = list()
+                curr_segment_ndd_measurements = list()
+
+                for sent in segment:
+                    i += 1
+                    sent_mdd = mdd(sent)
+                    sent_ndd = ndd(sent, sent_mdd)
+                    if dataset == first_segments:
+                        sc_measurements["first_mdd"].append(sent_mdd)
+                        sc_measurements["first_ndd"].append(sent_ndd)
+                    else:
+                        sc_measurements["second_mdd"].append(sent_mdd)
+                        sc_measurements["second_ndd"].append(sent_ndd)
+                    
+                    curr_segment_mdd_measurements.append(sent_mdd)
+                    curr_segment_ndd_measurements.append(sent_ndd)
+
+                    wf_sc.write("\t".join([str(i), str(sent_mdd), str(sent_ndd)]) + "\n")
+                
+                # ignore strange segments that do not have any valid dependency distances 
+                if all([x is np.nan for x in curr_segment_mdd_measurements]):
+                    continue
+
+                if all([x is np.nan for x in curr_segment_ndd_measurements]):
+                    continue
+                
+                if dataset == first_segments:
+                    sc_segment_measurements["first_mdd"].append(curr_segment_mdd_measurements)
+                    sc_segment_measurements["first_ndd"].append(curr_segment_ndd_measurements)
                 else:
-                    sc_measurements["second_mdd"].append(sent_mdd)
-                    sc_measurements["second_ndd"].append(sent_ndd)
+                    sc_segment_measurements["second_mdd"].append(curr_segment_mdd_measurements)
+                    sc_segment_measurements["second_ndd"].append(curr_segment_ndd_measurements)
 
-                wf_sc.write("\t".join([str(i), str(sent_mdd), str(sent_ndd)]) + "\n")
-
-            # calculate the mean and stdev
-            if dataset == first_dataset:
+            # calculate the global mean and stdev values
+            if dataset == first_segments:
                 mean_mdd = mean([x for x in sc_measurements["first_mdd"] if x is not np.nan])
                 mean_ndd = mean([x for x in sc_measurements["first_ndd"] if x is not np.nan])
                 wf_sc.write("\t".join(["MEAN", str(mean_mdd), str(mean_ndd)]) + "\n")
@@ -150,6 +135,7 @@ def export_syntactic_complexity_measure(first_dataset: list, second_dataset: lis
                 rc.stdev_mdd[1] = stdev_mdd
                 rc.stdev_ndd[1] = stdev_ndd
 
+        """
         first_df = pd.DataFrame({"MDD": sc_measurements["first_mdd"],
                                  "NDD": sc_measurements["first_ndd"]})
         second_df = pd.DataFrame({"MDD": sc_measurements["second_mdd"],
@@ -158,7 +144,7 @@ def export_syntactic_complexity_measure(first_dataset: list, second_dataset: lis
         first_df.dropna(inplace=True)
         second_df.dropna(inplace=True)
 
-        """# calculate the Wilcoxon signed-rank statistical test and write into the results file
+        # calculate the Wilcoxon signed-rank statistical test and write into the results file
         mdd_stat, mdd_p_value = wilcoxon(list(sc_df["Human_mdd"]), list(sc_df["LLM_mdd"]))
         wf_sc.write("\n===============================================\n")
         wf_sc.write(f"MDD Wilcoxon signed-rank test statistic: {mdd_stat}, p-value: {mdd_p_value}")
@@ -169,9 +155,14 @@ def export_syntactic_complexity_measure(first_dataset: list, second_dataset: lis
         wf_sc.write(f"NDD Wilcoxon signed-rank test statistic: {ndd_stat}, p-value: {ndd_p_value}")
         wf_sc.write("\n===============================================\n")"""
 
-    draw_sc_histogram([x for x in sc_measurements["first_ndd"] if not isinstance(x, str)],
-                      [x for x in sc_measurements["second_ndd"] if not isinstance(x, str)],
-                      rc.mean_ndd[0], rc.mean_ndd[1], mode="NDD")
-    draw_sc_histogram([x for x in sc_measurements["first_mdd"] if not isinstance(x, str)],
-                      [x for x in sc_measurements["second_mdd"] if not isinstance(x, str)],
-                      rc.mean_mdd[0], rc.mean_mdd[1], mode="MDD")
+    # calculate segment mean values
+    sc_segment_measurements["first_mdd_means"] = [mean([x for x in segment if x is not np.nan]) for segment in sc_segment_measurements["first_mdd"]]
+    sc_segment_measurements["first_ndd_means"] = [mean([x for x in segment if x is not np.nan]) for segment in sc_segment_measurements["first_ndd"]]
+    sc_segment_measurements["second_mdd_means"] = [mean([x for x in segment if x is not np.nan]) for segment in sc_segment_measurements["second_mdd"]]
+    sc_segment_measurements["second_ndd_means"] = [mean([x for x in segment if x is not np.nan]) for segment in sc_segment_measurements["second_ndd"]]
+
+    plot_histogram(sc_segment_measurements["first_mdd_means"], sc_segment_measurements["second_mdd_means"], 
+                   "Mean Dependency Distance", output_dir, rc, segmentation_mode=segmentation_mode)
+    
+    plot_histogram(sc_segment_measurements["first_ndd_means"], sc_segment_measurements["second_ndd_means"], 
+                   "Normalized Dependency Distance", output_dir, rc, segmentation_mode=segmentation_mode)

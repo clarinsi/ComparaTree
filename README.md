@@ -30,7 +30,9 @@ Other configuration options that can be used when running the command described 
 
 NOTE: The syntactic diversity measure calculations currently incorporate the external [STARK](https://github.com/clarinsi/STARK) tool for dependency tree extraction. The process can be resource intensive and time consuming when generating comparisons for large treebanks. It is recommended that you set the segment length (see below) to at least 1000 (or more) when incorporating syntactic diversity comparisons for large treebanks.
 
-* `--segment_length`: Length of segments (in number of tokens) that the input treebanks will be split into. The segments are used in calculating lexical diversity, n-gram diversity, and syntactic diversity measures. Defaults to 1000.
+* `--segmentation_mode`: Method of splitting treebanks into segments. Pass in 'n' to manually set the segment length and specify the length using the '--segment_length' argument. Pass in 'doc_from_newdoc' to split the treebank into documents and infer document boundaries from the 'newdoc id' sentence comment. Pass in 'doc_from_id' to split the treebank into documents and infer document boundaries from sentence ids (assuming that sentence ids are of the format 'doc3022.27.7', where 'doc3022' denotes the document id).
+
+* `--segment_length`: Length of segments (in number of tokens) that the input treebanks will be split into if --segmentation_mode is set to 'n'. The segments are used in calculating lexical diversity, n-gram diversity, and syntactic diversity measures. Defaults to 1000.
 
 * `--first_treebank_name`: The name to be used for the first treebank. Defaults to the file name of the first dataset.
 
@@ -40,7 +42,7 @@ NOTE: The syntactic diversity measure calculations currently incorporate the ext
 
 * `--n_grams_n_list`: List of values of n for n-gram-based calculations. Separate the values by commas, as such: '3,4,5'. Defaults to '3'.
 
-* `--export_n_grams`: Enables exporting n-gram frequencies for every segment. Warning, this can result in very large output files!!
+* `--export_n_grams`: Enables exporting n-gram frequencies for every segment. WARNING: this can result in very large output files!!
 
 ## Citation
 
