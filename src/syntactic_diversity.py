@@ -159,6 +159,9 @@ def get_tree_diversity(first_segments, second_segments, stark_config, mode, outp
 
     plot_histogram(first_tds_list, second_tds_list, "Tree Diversity Score", output_dir, rc, segmentation_mode=segmentation_mode)
 
+    rc.addto_seg_values_df("TDS", first_tds_list, "first")
+    rc.addto_seg_values_df("TDS", second_tds_list, "second")
+
 
 def compare_unique_trees(first_trees_file, second_trees_file, output_dir, rc: ResultContainer):
     def draw_venn(Ab, aB, AB):

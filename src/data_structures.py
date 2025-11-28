@@ -1,4 +1,5 @@
 import os
+import pandas as pd
 
 
 # A class that stores the most important results of the analysis. The variables are generally in the form of a
@@ -46,6 +47,28 @@ class ResultContainer:
         self.stdev_tree_diversity_score = [0, 0]
         self.unique_trees = [0, 0]
         self.intersection = 0
+
+        # per-segment values
+        self.first_per_segment_df = pd.DataFrame()
+        self.second_per_segment_df = pd.DataFrame()
+
+
+    def addto_seg_values_df(self, header, values_list, dataset):
+        if dataset == "first":
+            self.first_per_segment_df[header] = values_list
+        elif dataset == "second":
+            self.second_per_segment_df[header] = values_list
+        else:
+            print("Please specify a valid dataset")
+    
+
+    def export_seg_values_df(self, path, dataset):
+        if dataset == "first":
+            self.first_per_segment_df.to_csv(path, sep="\t", header=True, index=True)
+        elif dataset == "second":
+            self.second_per_segment_df.to_csv(path, sep="\t", header=True, index=True)
+        else:
+            print("Please specify a valid dataset")
 
 
 # A class that stores the comparison configuration settings

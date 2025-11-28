@@ -106,3 +106,6 @@ def export_lexical_diversity_measures(first_segments, second_segments, output_di
 
         plot_histogram(f_ttr_l, s_ttr_l, "Type-Token Ratio", output_dir, rc, lim_one=True, segmentation_mode=segmentation_mode)
         #plot_histogram(f_mtld_l, s_mtld_l, "Measure of Textual Lexical Diversity", output_dir, rc)
+
+        rc.addto_seg_values_df("TTR", f_ttr_l, "first")
+        rc.addto_seg_values_df("TTR", s_ttr_l, "second")

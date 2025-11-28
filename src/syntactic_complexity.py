@@ -94,19 +94,12 @@ def export_syntactic_complexity_measure(first_segments: list, second_segments: l
 
                     wf_sc.write("\t".join([str(i), str(sent_mdd), str(sent_ndd)]) + "\n")
                 
-                # ignore strange segments that do not have any valid dependency distances 
-                if all([x is np.nan for x in curr_segment_mdd_measurements]):
-                    continue
-
-                if all([x is np.nan for x in curr_segment_ndd_measurements]):
-                    continue
-                
                 if dataset == first_segments:
-                    sc_segment_measurements["first_mdd"].append(curr_segment_mdd_measurements)
-                    sc_segment_measurements["first_ndd"].append(curr_segment_ndd_measurements)
+                    sc_segment_measurements["first_mdd"].append(curr_segment_mdd_measurements) if not all([x is np.nan for x in curr_segment_mdd_measurements]) else sc_segment_measurements["first_mdd"].append(None)
+                    sc_segment_measurements["first_ndd"].append(curr_segment_ndd_measurements) if not all([x is np.nan for x in curr_segment_ndd_measurements]) else sc_segment_measurements["first_ndd"].append(None)
                 else:
-                    sc_segment_measurements["second_mdd"].append(curr_segment_mdd_measurements)
-                    sc_segment_measurements["second_ndd"].append(curr_segment_ndd_measurements)
+                    sc_segment_measurements["second_mdd"].append(curr_segment_mdd_measurements) if not all([x is np.nan for x in curr_segment_mdd_measurements]) else sc_segment_measurements["second_mdd"].append(None)
+                    sc_segment_measurements["second_ndd"].append(curr_segment_ndd_measurements) if not all([x is np.nan for x in curr_segment_ndd_measurements]) else sc_segment_measurements["second_ndd"].append(None)
 
             # calculate the global mean and stdev values
             if dataset == first_segments:
@@ -155,14 +148,19 @@ def export_syntactic_complexity_measure(first_segments: list, second_segments: l
         wf_sc.write(f"NDD Wilcoxon signed-rank test statistic: {ndd_stat}, p-value: {ndd_p_value}")
         wf_sc.write("\n===============================================\n")"""
 
-    # calculate segment mean values
-    sc_segment_measurements["first_mdd_means"] = [mean([x for x in segment if x is not np.nan]) for segment in sc_segment_measurements["first_mdd"]]
-    sc_segment_measurements["first_ndd_means"] = [mean([x for x in segment if x is not np.nan]) for segment in sc_segment_measurements["first_ndd"]]
-    sc_segment_measurements["second_mdd_means"] = [mean([x for x in segment if x is not np.nan]) for segment in sc_segment_measurements["second_mdd"]]
-    sc_segment_measurements["second_ndd_means"] = [mean([x for x in segment if x is not np.nan]) for segment in sc_segment_measurements["second_ndd"]]
-
-    plot_histogram(sc_segment_measurements["first_mdd_means"], sc_segment_measurements["second_mdd_means"], 
+    """
+    # calculate segment mean values if needed
+    sc_segment_measurements["first_mdd_means"] = [mean([x for x in segment if x is not np.nan]) if segment else np.nan for segment in sc_segment_measurements["first_mdd"]]
+    sc_segment_measurements["first_ndd_means"] = [mean([x for x in segment if x is not np.nan]) if segment else np.nan for segment in sc_segment_measurements["first_ndd"]]
+    sc_segment_measurements["second_mdd_means"] = [mean([x for x in segment if x is not np.nan]) if segment else np.nan for segment in sc_segment_measurements["second_mdd"]]
+    sc_segment_measurements["second_ndd_means"] = [mean([x for x in segment if x is not np.nan]) if segment else np.nan for segment in sc_segment_measurements["second_ndd"]]
+    """
+    
+    plot_histogram(sc_measurements["first_mdd"], sc_measurements["second_mdd"], 
                    "Mean Dependency Distance", output_dir, rc, segmentation_mode=segmentation_mode)
     
-    plot_histogram(sc_segment_measurements["first_ndd_means"], sc_segment_measurements["second_ndd_means"], 
+    plot_histogram(sc_measurements["first_ndd"], sc_measurements["second_ndd"], 
                    "Normalized Dependency Distance", output_dir, rc, segmentation_mode=segmentation_mode)
+    
+    #rc.addto_seg_values_df("NDD", sc_segment_measurements["first_ndd_means"], "first")
+    #rc.addto_seg_values_df("NDD", sc_segment_measurements["second_ndd_means"], "second")

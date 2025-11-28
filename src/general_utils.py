@@ -1,14 +1,16 @@
-from statistics import mean, stdev, median
+from statistics import mean, stdev
 import seaborn as sns
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
-from matplotlib_venn import venn2
+#from matplotlib_venn import venn2
 from tabulate import tabulate
 import conllu
 import os
 import logging
 
 from data_structures import ResultContainer
+from stat_utils import check_for_normality
 
 
 # parse conllu files
@@ -73,6 +75,23 @@ def split_into_segm(dataset, segmentation_mode, segment_length=1000):
             segments.append(curr_segment)
 
     return segments
+
+
+def get_segm_ids(segments, segmentation_mode):
+    ids_list = list()
+    if segmentation_mode in ["doc_from_newdoc", "doc_from_id"]:
+        for segment in segments:
+            ids_list.append(segment[0].metadata["sent_id"].split(".")[0])
+    else:
+        for i in range(len(segments)):
+            ids_list.append(i)
+    
+    return ids_list
+
+
+"""
+    Visualization functions
+"""
 
 
 # function for drawing histograms. first_data and second_data should be lists of calculated values for the measure for
@@ -145,6 +164,46 @@ def plot_histogram(first_data, second_data, measure, output_dir, rc: ResultConta
     fig.text(0, 0.01, caption, wrap=True, fontsize=10)
 
     plt.savefig(f"{output_dir}/{measure}_histogram.png")
+
+
+# general function for drawing stripplots
+def draw_stripplot(first_data, second_data, measure, output_dir, names):
+
+    # manually set matplotlib's logging level due to some strange debug messages
+    plt.set_loglevel("warning")
+    logging.getLogger('PIL').setLevel(logging.WARNING)
+
+    print(f"Plotting {measure} stripplot")
+    stripplot_df = pd.DataFrame({"value": list(first_data) + list(second_data),
+                                 "dataset": [names[0]] * len(first_data) + [names[1]] * len(second_data)})
+
+    plt.figure(figsize=(10, 8))
+    sns.stripplot(data=stripplot_df, x="dataset", y="value", jitter=True, alpha=0.6, palette="flare")
+    plt.title(f"{measure} Stripplot")
+    plt.savefig(os.path.join(output_dir, f"{measure}_stripplot.png"))
+    plt.close()
+
+
+# function for drawing a stripplot for a single dataset for all values
+def draw_stripplot_single_dataset(dataset, measures, output_dir, dataset_name):
+    n = len(measures)
+    fig, axes = plt.subplots(1, n, figsize=(5*n, 6), sharey=False)
+
+    # If there's only one measure, axes won't be a list
+    if n == 1:
+        axes = [axes]
+
+    for ax, measure in zip(axes, measures):
+        sns.stripplot(y=dataset[measure], ax=ax, jitter=True, alpha=0.6)
+        ax.set_title(measure)
+        ax.set_xlabel("")
+        ax.text(0.5, -0.15, f"Shapiro-Wilk p value: {check_for_normality(dataset[measure])[1]}", 
+                ha="center", va="top", transform=ax.transAxes, fontsize=10)
+
+    plt.tight_layout()
+    
+    plt.savefig(os.path.join(output_dir, f"{dataset_name}_combined_stripplots.png"))
+    plt.close()
 
 
 # output the basic statistics for a dataset composed of sentences in the conllu format
@@ -224,14 +283,19 @@ def basic_stats_segments(first_segments, second_segments, output_dir, rc: Result
     rc.meanwords = [first_mean_words, second_mean_words]
     rc.stdevwords = [first_stdev_words, second_stdev_words]
 
-    # visualization of overall segment length
-    plot_histogram(first_overall_seg_lengths, second_overall_seg_lengths, "Segment Length", output_dir, rc, segmentation_mode=segmentation_mode)
+    # visualization of overall segment length. This excludes cases when the segmentation mode is set to n, 
+    # since segment length is obvious in that case
+    if segmentation_mode != "n":
+        plot_histogram(first_overall_seg_lengths, second_overall_seg_lengths, "Segment Length", output_dir, rc, segmentation_mode=segmentation_mode)
 
     # segment level visualization of mean sentence length
-    plot_histogram(first_seg_mean_words, second_seg_mean_words, "Average Sentence Length", output_dir, rc, segmentation_mode=segmentation_mode)
+    #plot_histogram(first_seg_mean_words, second_seg_mean_words, "Average Sentence Length", output_dir, rc, segmentation_mode=segmentation_mode)
 
     # sentence level visualization of mean sentence length
-    #plot_histogram(first_wps, second_wps, "Average Sentence Length", output_dir, rc)
+    plot_histogram(first_wps, second_wps, "Average Sentence Length", output_dir, rc)
+
+    rc.addto_seg_values_df("seg_length", first_overall_seg_lengths, "first")
+    rc.addto_seg_values_df("seg_length", second_overall_seg_lengths, "second")
 
 
 """
@@ -424,7 +488,6 @@ def write_html_summary(output_dir, rc: ResultContainer):
         <div>
             <h3>Basic</h3>
                 <img src="Average Sentence Length_histogram.png"><br>
-                <img style="margin-top: 40pt" src="Segment Length_histogram.png"><br>
         </div>
         <div>
             <h3>Lexical Diversity</h3>
@@ -441,8 +504,7 @@ def write_html_summary(output_dir, rc: ResultContainer):
         </div>
         <div>
             <h3 style="margin-top: 40pt">Syntactic Complexity</h3>
-                <img src="Mean Dependency Distance_histogram.png"><br>
-                <img style="margin-top: 40pt" src="Normalized Dependency Distance_histogram.png"><br>
+                <img src="Normalized Dependency Distance_histogram.png"><br>
         </div>
         <div>
             <h3 style="margin-top: 40pt">Syntactic Diversity</h3>

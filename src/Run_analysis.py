@@ -2,7 +2,7 @@ import os
 from argparse import ArgumentParser
 
 from data_structures import ResultContainer, ComparisonConfig
-from general_utils import split_into_segm, basic_stats_segments, plot_histogram, write_html_summary, parse_conllu, format_results
+from general_utils import split_into_segm, basic_stats_segments, plot_histogram, draw_stripplot, draw_stripplot_single_dataset, write_html_summary, parse_conllu, format_results, get_segm_ids
 from lexical_measures import export_lexical_diversity_measures
 from tag_proportions import export_tag_proportions
 from syntactic_complexity import export_syntactic_complexity_measure
@@ -68,6 +68,12 @@ if __name__ == "__main__":
     first_segments = split_into_segm(first_parsed, comparison_config.segmentation_mode,segment_length=comparison_config.segment_length)
     second_segments = split_into_segm(second_parsed, comparison_config.segmentation_mode, segment_length=comparison_config.segment_length)
 
+    """
+    # add the segment ids to the resulting per-segment value dataframe
+    result_container.addto_seg_values_df("doc_id", get_segm_ids(first_segments, comparison_config.segmentation_mode), "first")
+    result_container.addto_seg_values_df("doc_id", get_segm_ids(second_segments, comparison_config.segmentation_mode), "second")
+    """
+    
     if any([x in comparison_config.analysis_levels for x in ["bs", "full"]]):
         # first calculate basic statistics for each dataset
         basic_stats_segments(first_segments, second_segments, comparison_config.output_dir, result_container, segmentation_mode=comparison_config.segmentation_mode)
@@ -91,9 +97,12 @@ if __name__ == "__main__":
         second_ngd_dict = export_ngrams(second_segments, comparison_config.output_dir, f"second", comparison_config.ngrams_n_list, result_container,
                                     comparison_config, export_all_ngrams=comparison_config.export_n_grams)
 
-        # plot the n-gram histograms
+        # plot the n-gram histograms and store per-segment values
         for n in comparison_config.ngrams_n_list:
             plot_histogram(first_ngd_dict[n], second_ngd_dict[n], f"{n}-Gram Diversity Score", comparison_config.output_dir, result_container, segmentation_mode=comparison_config.segmentation_mode)
+
+            result_container.addto_seg_values_df(f"{n}GD", first_ngd_dict[n], "first")
+            result_container.addto_seg_values_df(f"{n}GD", second_ngd_dict[n], "second")
 
     if any([x in comparison_config.analysis_levels for x in ["sd", "full"]]):
         # run stark for both datasets and obtain the TDS metric for every segment
@@ -106,3 +115,8 @@ if __name__ == "__main__":
     # TODO: only output those html sections that correspond to the user's selected analysis levels
     # summarize the results
     write_html_summary(comparison_config.output_dir, result_container)
+
+    # Export a common dataframe containing per-segment values for various measures
+    result_container.export_seg_values_df(os.path.join(comparison_config.output_dir, f"per-segment_df_first.tsv"), "first")
+    result_container.export_seg_values_df(os.path.join(comparison_config.output_dir, f"per-segment_df_second.tsv"), "second")
+
