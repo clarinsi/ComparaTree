@@ -6,8 +6,9 @@ from collections import defaultdict
 from statistics import mean, stdev, median
 from math import log, sqrt, ceil
 
-from data_structures import ResultContainer
+from data_structures import ResultContainer, ComparisonConfig
 from general_utils import plot_histogram
+from stat_utils import return_bootstrapped
 
 
 """
@@ -52,7 +53,10 @@ def ndd(sentence, sent_mdd):
 
 
 # main function to make the syntactic complexity calculation
-def export_syntactic_complexity_measure(first_segments: list, second_segments: list, output_dir, rc: ResultContainer, segmentation_mode):
+def export_syntactic_complexity_measure(first_segments: list, second_segments: list, cc: ComparisonConfig, rc: ResultContainer):
+    output_dir = cc.output_dir
+    segmentation_mode = cc.segmentation_mode
+
     print(f"Calculating syntactic complexity (MDD and NDD)")
 
     with open(f"{output_dir}/syntactic_complexity.tsv", "w", encoding="utf-8") as wf_sc:
@@ -156,11 +160,13 @@ def export_syntactic_complexity_measure(first_segments: list, second_segments: l
     sc_segment_measurements["second_ndd_means"] = [mean([x for x in segment if x is not np.nan]) if segment else np.nan for segment in sc_segment_measurements["second_ndd"]]
     """
     
-    plot_histogram(sc_measurements["first_mdd"], sc_measurements["second_mdd"], 
-                   "Mean Dependency Distance", output_dir, rc, segmentation_mode=segmentation_mode)
+    plot_histogram(sc_measurements["first_mdd"], sc_measurements["second_mdd"], "Mean Dependency Distance", cc, rc)
     
-    plot_histogram(sc_measurements["first_ndd"], sc_measurements["second_ndd"], 
-                   "Normalized Dependency Distance", output_dir, rc, segmentation_mode=segmentation_mode)
+    plot_histogram(sc_measurements["first_ndd"], sc_measurements["second_ndd"], "Normalized Dependency Distance", cc, rc)
+
+    # bootstrap visualizations
+    if cc.export_bootstrapped:
+        plot_histogram(return_bootstrapped(sc_measurements["first_ndd"], np.std), return_bootstrapped(sc_measurements["second_ndd"], np.std), "Bootstrapped Normalized Dependency Distance", cc, rc)
     
     #rc.addto_seg_values_df("NDD", sc_segment_measurements["first_ndd_means"], "first")
     #rc.addto_seg_values_df("NDD", sc_segment_measurements["second_ndd_means"], "second")

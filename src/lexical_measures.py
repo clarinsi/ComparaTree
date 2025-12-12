@@ -1,8 +1,10 @@
 from lexical_diversity import lex_div as ld
 from statistics import mean, stdev, median
+from collections import Counter
 
-from data_structures import ResultContainer
+from data_structures import ResultContainer, ComparisonConfig
 from general_utils import plot_histogram
+from stat_utils import draw_rankfreq, export_rankfreq_plots, return_bootstrapped
 
 
 """
@@ -13,7 +15,10 @@ from general_utils import plot_histogram
 
 
 # define a function that will calculate the lexical diversity measure and plot the histograms
-def export_lexical_diversity_measures(first_segments, second_segments, output_dir, rc: ResultContainer, segmentation_mode):
+def export_lexical_diversity_measures(first_segments, second_segments, cc: ComparisonConfig, rc: ResultContainer):
+    output_dir = cc.output_dir
+    segmentation_mode = cc.segmentation_mode
+
     print("Exporting lexical diversity measures")
 
     # open output file
@@ -104,8 +109,26 @@ def export_lexical_diversity_measures(first_segments, second_segments, output_di
         wf_ld.write(f"MTLD Wilcoxon signed-rank test statistic: {mtld_stat}, p-value: {mtld_p_value}")
         wf_ld.write("\n===============================================")"""
 
-        plot_histogram(f_ttr_l, s_ttr_l, "Type-Token Ratio", output_dir, rc, lim_one=True, segmentation_mode=segmentation_mode)
-        #plot_histogram(f_mtld_l, s_mtld_l, "Measure of Textual Lexical Diversity", output_dir, rc)
+        plot_histogram(f_ttr_l, s_ttr_l, "Type-Token Ratio", cc, rc, lim_one=True)
+        #plot_histogram(f_mtld_l, s_mtld_l, "Measure of Textual Lexical Diversity", cc, rc)
+
+        # bootstrap visualizations
+        if cc.export_bootstrapped:
+            plot_histogram(return_bootstrapped(f_ttr_l, stdev), return_bootstrapped(s_ttr_l, stdev), "Bootstrapped Type-Token Ratio", cc, rc)
 
         rc.addto_seg_values_df("TTR", f_ttr_l, "first")
         rc.addto_seg_values_df("TTR", s_ttr_l, "second")
+
+        # draw rank-frequency plots for every segment
+        if cc.export_rankfreq_plots:
+            first_segms_lemma_freqs = [Counter(s).values() for s in first_segms_lemmas]
+            second_segms_lemma_freqs = [Counter(s).values() for s in second_segms_lemmas]
+            i = 0
+            while i < 3:
+                export_rankfreq_plots(first_segms_lemma_freqs[i], str(i), "first_lexical_diversity", output_dir, rc)
+                i += 1
+
+            i = 0
+            while i < 3:
+                export_rankfreq_plots(second_segms_lemma_freqs[i], str(i), "second_lexical_diversity", output_dir, rc)
+                i += 1

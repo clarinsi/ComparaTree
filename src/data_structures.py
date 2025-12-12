@@ -121,3 +121,10 @@ class ComparisonConfig:
         for lev in self.analysis_levels:
             if lev not in ["bs", "ld", "tp", "sc", "nd", "sd", "full"]:
                 raise Exception("Only the following analysis level abbreviations are permitted: bs – basic level, ld – lexical diversity, tp – tag proportions, sc - syntactic complexity, nd – n-gram diversity, sd – syntactic diversity, full – full analysis")
+            
+        # settings that aren't exposed publically (maybe add later as CLI arguments)
+        self.export_bootstrapped = False
+        self.export_rankfreq_plots = False
+        self.test_normality = False
+        self.significance_tests = False
+        self.effect_sizes = False

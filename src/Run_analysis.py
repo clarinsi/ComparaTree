@@ -1,5 +1,6 @@
 import os
 from argparse import ArgumentParser
+from statistics import stdev
 
 from data_structures import ResultContainer, ComparisonConfig
 from general_utils import split_into_segm, basic_stats_segments, plot_histogram, draw_stripplot, draw_stripplot_single_dataset, write_html_summary, parse_conllu, format_results, get_segm_ids
@@ -8,6 +9,7 @@ from tag_proportions import export_tag_proportions
 from syntactic_complexity import export_syntactic_complexity_measure
 from n_grams import export_ngrams
 from syntactic_diversity import get_tree_diversity
+from stat_utils import return_bootstrapped
 
 
 def parse_args():
@@ -76,38 +78,39 @@ if __name__ == "__main__":
     
     if any([x in comparison_config.analysis_levels for x in ["bs", "full"]]):
         # first calculate basic statistics for each dataset
-        basic_stats_segments(first_segments, second_segments, comparison_config.output_dir, result_container, segmentation_mode=comparison_config.segmentation_mode)
+        basic_stats_segments(first_segments, second_segments, comparison_config, result_container)
 
     if any([x in comparison_config.analysis_levels for x in ["ld", "full"]]):
         # calculate lexical diversity measures
-        export_lexical_diversity_measures(first_segments, second_segments, comparison_config.output_dir, result_container, comparison_config.segmentation_mode)
+        export_lexical_diversity_measures(first_segments, second_segments, comparison_config, result_container)
 
     if any([x in comparison_config.analysis_levels for x in ["tp", "full"]]):
         # calculate POS tag and dependency relation proportions
-        export_tag_proportions(first_parsed, second_parsed, comparison_config.output_dir, "upos", result_container)
-        export_tag_proportions(first_parsed, second_parsed, comparison_config.output_dir, "deprel", result_container)
+        export_tag_proportions(first_parsed, second_parsed, comparison_config, "upos", result_container)
+        export_tag_proportions(first_parsed, second_parsed, comparison_config, "deprel", result_container)
 
     if any([x in comparison_config.analysis_levels for x in ["sc", "full"]]):
         # calculate syntactic complexity measures
-        export_syntactic_complexity_measure(first_segments, second_segments, comparison_config.output_dir, result_container, comparison_config.segmentation_mode)
+        export_syntactic_complexity_measure(first_segments, second_segments, comparison_config, result_container)
 
     if any([x in comparison_config.analysis_levels for x in ["nd", "full"]]):
-        first_ngd_dict = export_ngrams(first_segments, comparison_config.output_dir, f"first", comparison_config.ngrams_n_list, result_container,
-                                    comparison_config, export_all_ngrams=comparison_config.export_n_grams)
-        second_ngd_dict = export_ngrams(second_segments, comparison_config.output_dir, f"second", comparison_config.ngrams_n_list, result_container,
-                                    comparison_config, export_all_ngrams=comparison_config.export_n_grams)
+        first_ngd_dict = export_ngrams(first_segments, f"first", result_container, comparison_config)
+        second_ngd_dict = export_ngrams(second_segments,f"second", result_container, comparison_config)
 
         # plot the n-gram histograms and store per-segment values
         for n in comparison_config.ngrams_n_list:
-            plot_histogram(first_ngd_dict[n], second_ngd_dict[n], f"{n}-Gram Diversity Score", comparison_config.output_dir, result_container, segmentation_mode=comparison_config.segmentation_mode)
+            plot_histogram(first_ngd_dict[n], second_ngd_dict[n], f"{n}-Gram Diversity Score", comparison_config, result_container)
+
+            # bootstrap visualizations
+            if comparison_config.export_bootstrapped:
+                plot_histogram(return_bootstrapped(first_ngd_dict[n], stdev), return_bootstrapped(second_ngd_dict[n], stdev),  f"Bootstrapped {n}-Gram Diversity Score", comparison_config, result_container)
 
             result_container.addto_seg_values_df(f"{n}GD", first_ngd_dict[n], "first")
             result_container.addto_seg_values_df(f"{n}GD", second_ngd_dict[n], "second")
 
     if any([x in comparison_config.analysis_levels for x in ["sd", "full"]]):
         # run stark for both datasets and obtain the TDS metric for every segment
-        get_tree_diversity(first_segments, second_segments, comparison_config.stark_config_file,
-                        "Tree Diversity Score", comparison_config.output_dir, result_container, segmentation_mode=comparison_config.segmentation_mode)
+        get_tree_diversity(first_segments, second_segments, comparison_config, result_container)
 
     # format numeric values in result
     format_results(result_container)

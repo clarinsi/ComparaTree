@@ -13,8 +13,9 @@ import re
 from stark.stark import run as stark_run
 from stark.stark import read_configs as stark_read_configs
 
-from data_structures import ResultContainer
+from data_structures import ResultContainer, ComparisonConfig
 from general_utils import plot_histogram
+from stat_utils import draw_rankfreq, export_rankfreq_plots, return_bootstrapped
 
 
 """
@@ -24,8 +25,11 @@ from general_utils import plot_histogram
 """
 
 
-def get_tree_diversity(first_segments, second_segments, stark_config, mode, output_dir,
-                       rc: ResultContainer, segmentation_mode):
+def get_tree_diversity(first_segments, second_segments, cc: ComparisonConfig, rc: ResultContainer):
+    stark_config = cc.stark_config_file
+    output_dir = cc.output_dir
+    segmentation_mode = cc.segmentation_mode
+
     print("Starting tree diversity calculation")
     print("Starting STARK tree extraction")
     first_tds_list = list()
@@ -120,6 +124,7 @@ def get_tree_diversity(first_segments, second_segments, stark_config, mode, outp
         stark_run(stark_read_configs(stark_config))
 
     # calculate the tds for each treebank
+    first_freqs_list = list()
     for seg_id in range(num_segments_first):
         with open(f"{output_dir}/syntactic_diversity/stark_trees_first/segment_{str(seg_id + 1)}.txt", "r",
                   encoding="utf-8") as rf_first_trees:
@@ -130,11 +135,14 @@ def get_tree_diversity(first_segments, second_segments, stark_config, mode, outp
                     tree, freq = line.split("\t")[:2]
                     trees.append(tree)
                     freqs.append(int(freq))
+            
+            first_freqs_list.append(freqs)
 
             # calculate the tree diversity score for this segment
             segment_tds = len(trees) / sum(freqs)
             first_tds_list.append(segment_tds)
 
+    second_freqs_list = list()
     for seg_id in range(num_segments_second):
         with open(f"{output_dir}/syntactic_diversity/stark_trees_second/segment_{str(seg_id + 1)}.txt", "r",
                   encoding="utf-8") as rf_second_trees:
@@ -145,10 +153,24 @@ def get_tree_diversity(first_segments, second_segments, stark_config, mode, outp
                     tree, freq = line.split("\t")[:2]
                     trees.append(tree)
                     freqs.append(int(freq))
+            
+            second_freqs_list.append(freqs)
 
             # calculate the tree diversity score for this segment
             segment_tds = len(trees) / sum(freqs)
             second_tds_list.append(segment_tds)
+    
+    # Export rank frequency distribution plots for the first three segments
+    if cc.export_rankfreq_plots:
+        i = 0
+        while i < 3:
+            export_rankfreq_plots(first_freqs_list[i], str(i), "first_syntactic_diversity", output_dir, rc)
+            i += 1
+
+        i = 0
+        while i < 3:
+            export_rankfreq_plots(second_freqs_list[i], str(i), "second_syntactic_diversity", output_dir, rc)
+            i += 1
 
     # store the mean and standard deviation of the TDS for each treebank and draw a histogram
     rc.tree_diversity_score = [mean(first_tds_list), mean(second_tds_list)]
@@ -157,7 +179,11 @@ def get_tree_diversity(first_segments, second_segments, stark_config, mode, outp
     second_stdev = stdev(second_tds_list) if len(second_tds_list) > 1 else None
     rc.stdev_tree_diversity_score = [first_stdev, second_stdev]
 
-    plot_histogram(first_tds_list, second_tds_list, "Tree Diversity Score", output_dir, rc, segmentation_mode=segmentation_mode)
+    plot_histogram(first_tds_list, second_tds_list, "Tree Diversity Score", cc, rc)
+
+    # bootstrap visualizations
+    if cc.export_bootstrapped:
+        plot_histogram(return_bootstrapped(first_tds_list, stdev), return_bootstrapped(second_tds_list, stdev), "Bootstrapped Tree Diversity Score", cc, rc)
 
     rc.addto_seg_values_df("TDS", first_tds_list, "first")
     rc.addto_seg_values_df("TDS", second_tds_list, "second")

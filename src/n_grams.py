@@ -8,6 +8,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 from data_structures import ResultContainer, ComparisonConfig
+from stat_utils import draw_rankfreq, export_rankfreq_plots
 
 """
     Functions to calculate the average relative frequencies of n-grams for various values of n, 
@@ -17,8 +18,11 @@ from data_structures import ResultContainer, ComparisonConfig
 
 
 # define a function that will calculate the n-gram diversity score.
-def export_ngrams(segment_list, output_dir, mode, n_list, rc: ResultContainer, cc: ComparisonConfig, 
-                  export_all_ngrams=False, threshold=20):
+def export_ngrams(segment_list, mode, rc: ResultContainer, cc: ComparisonConfig):
+    output_dir = cc.output_dir
+    n_list = cc.ngrams_n_list
+    export_all_ngrams = cc.export_n_grams
+
     first_segm_sen_list = list()
     for segm in segment_list:
         # We have to ignore punctuation and other misc. characters here, so that they do not show up within n-grams.
@@ -55,19 +59,6 @@ def export_ngrams(segment_list, output_dir, mode, n_list, rc: ResultContainer, c
                         for key, value in curr_sent_counter.items():
                             segment_frequencies[key] += value
 
-                """# convert the frequencies to relative frequencies (freq. per million)
-                relative_frequencies = dict()
-                corpus_size = sum([len(x) for x in sentence_list])
-                for key, value in segment_frequencies.items():
-                    relative_frequencies[key] = (value * 1000000) / corpus_size"""
-
-                """# calculate the mean and median relative frequency. Only trees that appear with a minimum frequency per
-                # million over some threshold are included in the calculation
-                # TODO: move this threshold into the input config object
-                mean_rel_freq = mean([x for x in relative_frequencies.values() if x >= threshold])
-
-                median_rel_freq = median([x for x in relative_frequencies.values() if x >= threshold])"""
-
                 # count the total number of n-grams in the segment and then calculate the NGD (N-gram Diversity Score)
                 frequencies_sum = sum(segment_frequencies.values())
                 ngd = len(segment_frequencies.keys()) / frequencies_sum if frequencies_sum > 0 else 0 # not the best solution for empty segments, but should temporarily work fine
@@ -88,7 +79,12 @@ def export_ngrams(segment_list, output_dir, mode, n_list, rc: ResultContainer, c
                             wf_ngrams.write("\t".join([str(ngram_form), str(segment_frequencies[ngram_form])]) + "\n")
                         wf_ngrams.write("\n")
 
-                i += 1
+                # draw rank frequency plots for this segment (only for the first three segments)
+                if cc.export_rankfreq_plots:
+                    if i < 3:
+                        export_rankfreq_plots(segment_frequencies.values(), i, f"{mode}_{n}-gram_diversity", output_dir, rc)
+
+                    i += 1
 
             # calculate the mean and standard deviation for this n and store the results
             mean_ngd = mean(ngd_dict[n])

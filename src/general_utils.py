@@ -1,4 +1,5 @@
 from statistics import mean, stdev
+from scipy.stats import permutation_test
 import seaborn as sns
 import numpy as np
 import pandas as pd
@@ -9,8 +10,13 @@ import conllu
 import os
 import logging
 
-from data_structures import ResultContainer
-from stat_utils import check_for_normality
+from data_structures import ResultContainer, ComparisonConfig
+from stat_utils import check_for_normality, return_bootstrapped
+
+
+# utility function to pass in to the function that performs the permutation test
+def mean_for_permutation(x, y):
+    return np.mean(x) - np.mean(y)
 
 
 # parse conllu files
@@ -96,7 +102,11 @@ def get_segm_ids(segments, segmentation_mode):
 
 # function for drawing histograms. first_data and second_data should be lists of calculated values for the measure for
 # every segment
-def plot_histogram(first_data, second_data, measure, output_dir, rc: ResultContainer, lim_one=False, segmentation_mode="n"):
+def plot_histogram(first_data, second_data, measure, cc: ComparisonConfig, rc: ResultContainer, lim_one=False):
+    output_dir = cc.output_dir
+    segmentation_mode = cc.segmentation_mode
+    test_normality = cc.test_normality
+    significance_tests = cc.significance_tests
 
     # manually set matplotlib's logging level due to some strange debug messages
     plt.set_loglevel("warning")
@@ -105,8 +115,18 @@ def plot_histogram(first_data, second_data, measure, output_dir, rc: ResultConta
     print(f"Plotting {measure} histogram")
     first_mean = mean([x for x in first_data if x is not np.nan])
     second_mean = mean([x for x in second_data if x is not np.nan])
-    first_stdev = stdev([x for x in first_data if x is not np.nan]) if len(first_data) > 1 else None
-    second_stdev = stdev([x for x in second_data if x is not np.nan]) if len(second_data) > 1 else None
+    first_stdev = np.std([x for x in first_data if x is not np.nan]) if len(first_data) > 1 else None
+    second_stdev = np.std([x for x in second_data if x is not np.nan]) if len(second_data) > 1 else None
+
+    # hypothesis testing
+    if test_normality:
+        shapiro_pvalue_first = check_for_normality([x for x in first_data if x is not np.nan])[1]
+        shapiro_pvalue_second = check_for_normality([x for x in second_data if x is not np.nan])[1]
+
+    permutation_text = ""
+    if significance_tests:
+        permutation_pvalue = permutation_test(([x for x in first_data if x is not np.nan], [x for x in second_data if x is not np.nan]), mean_for_permutation).pvalue
+        permutation_text = f"Permutation test p value: {permutation_pvalue}"
 
     # make histograms
     fig, axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
@@ -126,6 +146,9 @@ def plot_histogram(first_data, second_data, measure, output_dir, rc: ResultConta
     else:
         axes[0].text(0.95, 0.80, f"Standard deviation = N/A", color='orange', fontsize=14, ha='right',
                      va='top', transform=axes[0].transAxes)
+    if test_normality:
+        axes[0].text(0.95, 0.65, f"Shapiro-Wilk p = {shapiro_pvalue_first}", color='purple', fontsize=14, ha='right',
+                     va='top', transform=axes[0].transAxes)
 
     # Plot the second histogram
     sns.histplot(second_data, kde=False, ax=axes[1])
@@ -142,6 +165,9 @@ def plot_histogram(first_data, second_data, measure, output_dir, rc: ResultConta
     else:
         axes[1].text(0.95, 0.80, f"Standard deviation = N/A", color='orange', fontsize=14, ha='right',
                      va='top', transform=axes[1].transAxes)
+    if test_normality:
+        axes[1].text(0.95, 0.65, f"Shapiro-Wilk p = {shapiro_pvalue_second}", color='purple', 
+                     fontsize=14, ha='right', va='top', transform=axes[1].transAxes)
 
     # handle segmentation mode wording
     if segmentation_mode == "n":
@@ -160,7 +186,7 @@ def plot_histogram(first_data, second_data, measure, output_dir, rc: ResultConta
     caption = (r"$\bf{Figure:}$" + f"Histogram showing the frequency distribution for the {segmentation_mode_wording.lower()} "
                 f"{measure} in both treebanks. The x axis represents the range of values for the {measure}. "
                 f"The blue bars represent the number of observations for each value "
-                f"of the measure. The red vertical line represents the mean of the {measure}.")
+                f"of the measure. The red vertical line represents the mean of the {measure}. {permutation_text}")
     fig.text(0, 0.01, caption, wrap=True, fontsize=10)
 
     plt.savefig(f"{output_dir}/{measure}_histogram.png")
@@ -207,7 +233,9 @@ def draw_stripplot_single_dataset(dataset, measures, output_dir, dataset_name):
 
 
 # output the basic statistics for a dataset composed of sentences in the conllu format
-def basic_stats(first_dataset, second_dataset, output_dir, rc: ResultContainer):
+def basic_stats(first_dataset, second_dataset, cc: ComparisonConfig, rc: ResultContainer):
+    output_dir = cc.output_dir
+
     print("Calculating basic statistics")
     first_total_words = len([word for sent in first_dataset for word in sent])
     first_total_sents = len(first_dataset)
@@ -237,11 +265,14 @@ def basic_stats(first_dataset, second_dataset, output_dir, rc: ResultContainer):
     rc.meanwords = [first_mean_words, second_mean_words]
     rc.stdevwords = [first_stdev_words, second_stdev_words]
 
-    plot_histogram(first_wps, second_wps, "Average Sentence Length", output_dir, rc)
+    plot_histogram(first_wps, second_wps, "Average Sentence Length", cc, rc)
 
 
 # tweaked version of the basic statistics calculation function which works with segments
-def basic_stats_segments(first_segments, second_segments, output_dir, rc: ResultContainer, segmentation_mode="n"):
+def basic_stats_segments(first_segments, second_segments, cc: ComparisonConfig, rc: ResultContainer):
+    output_dir = cc.output_dir
+    segmentation_mode = cc.segmentation_mode
+
     print("Calculating basic statistics")
     first_total_words = len([word for first_seg in first_segments for sent in first_seg for word in sent])
     first_total_sents = len([sent for first_seg in first_segments for sent in first_seg])
@@ -286,13 +317,17 @@ def basic_stats_segments(first_segments, second_segments, output_dir, rc: Result
     # visualization of overall segment length. This excludes cases when the segmentation mode is set to n, 
     # since segment length is obvious in that case
     if segmentation_mode != "n":
-        plot_histogram(first_overall_seg_lengths, second_overall_seg_lengths, "Segment Length", output_dir, rc, segmentation_mode=segmentation_mode)
+        plot_histogram(first_overall_seg_lengths, second_overall_seg_lengths, "Segment Length", cc, rc)
 
     # segment level visualization of mean sentence length
     #plot_histogram(first_seg_mean_words, second_seg_mean_words, "Average Sentence Length", output_dir, rc, segmentation_mode=segmentation_mode)
 
     # sentence level visualization of mean sentence length
-    plot_histogram(first_wps, second_wps, "Average Sentence Length", output_dir, rc)
+    plot_histogram(first_wps, second_wps, "Average Sentence Length", cc, rc)
+
+    # bootstrap visualizations
+    if cc.export_bootstrapped:
+        plot_histogram(return_bootstrapped(first_wps, stdev), return_bootstrapped(second_wps, stdev), "Bootstrapped Average Sentence Length", cc, rc)
 
     rc.addto_seg_values_df("seg_length", first_overall_seg_lengths, "first")
     rc.addto_seg_values_df("seg_length", second_overall_seg_lengths, "second")

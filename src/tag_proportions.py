@@ -5,7 +5,7 @@ from scipy.stats import chisquare, wilcoxon
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-from data_structures import ResultContainer
+from data_structures import ResultContainer, ComparisonConfig
 
 
 """
@@ -21,7 +21,9 @@ from data_structures import ResultContainer
 
 # define a function that calculates the proportions for a given tag and outputs the result to a directory.
 # the function also outputs a barchart comparison for all the proportions in both datasets
-def export_tag_proportions(first_list, second_list, output_dir, mode, rc: ResultContainer):
+def export_tag_proportions(first_list, second_list, cc: ComparisonConfig, mode, rc: ResultContainer):
+    output_dir = cc.output_dir
+
     mode = mode.lower()
     if mode not in ["deprel", "upos"]:
         raise Exception("Error, mode should be either 'deprel' or 'upos'")
