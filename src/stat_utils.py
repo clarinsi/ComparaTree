@@ -10,15 +10,33 @@ import os
 from data_structures import ComparisonConfig, ResultContainer
 
 
+# utility function to pass in to the function that performs the permutation test
+def mean_for_permutation(x, y, axis=0):
+    return np.mean(x, axis=axis) - np.mean(y, axis=axis)
+
+
+# test whether the data is normally distributed
 def check_for_normality(data, sign_level=0.05):
     shapiro_test = shapiro(data)
 
     return (shapiro_test.pvalue < sign_level, shapiro_test.pvalue, shapiro_test.statistic)
 
 
+# utility function to indicate the level of statistical significance
+def p_to_star(p):
+    if p < 0.001:
+        return '***'
+    elif p < 0.01:
+        return '**'
+    elif p < 0.05:
+        return '*'
+    else:
+        return 'ns'
+
+
 # function that takes some data and performs a bootstrapping process. It returns a list of bootstrapped statistics 
 # that can then be used to inspect the true distribution. 
-def return_bootstrapped(data, statistic, n=10000):
+def return_bootstrapped(data, statistic, n=1000):
     bootstrapped_values = list()
     
     for sample_index in range(n):
@@ -26,14 +44,30 @@ def return_bootstrapped(data, statistic, n=10000):
         try:
             bootstrapped_values.append(statistic(bootstrap_sample))
         except:
-            raise Exception(f"promblem with {bootstrap_sample=}")
+            raise Exception(f"problem with {bootstrap_sample=}")
     
     return bootstrapped_values
 
 
-# An implementation of a permutation test for testing whether two samples come from the same distribution.
+# used for getting the ci for cohen's d (difference of means)
+def return_bootstrapped_ci(first_data, second_data, statistic, n=1000):
+    bootstrapped_values = list()
+
+    for resample_indey in range(n):
+        first_resample = random.choices(first_data, k=len(first_data))
+        second_resample = random.choices(second_data, k=len(second_data))
+        try:
+            bootstrapped_values.append(statistic(first_resample, second_resample))
+        except:
+            raise Exception(f"problem when resampling for bootstrap test!!!")
+        
+    # return the relevant quantiles for a 95% CI
+    return np.percentile(bootstrapped_values, 2.5), np.percentile(bootstrapped_values, 97.5)
+
+
+# A basic implementation of a permutation test for testing whether two samples come from the same distribution.
 # Taken from the following article: https://www.geeksforgeeks.org/machine-learning/permutation-tests-in-machine-learning/
-def permutation_test(group_a, group_b, num_permutations=10000):
+def permutation_test_basic(group_a, group_b, num_permutations=10000):
     observed_statistic = np.mean(group_a) - np.mean(group_b)
     combined_data = np.concatenate((group_a, group_b))
     permuted_statistics = []
@@ -45,8 +79,25 @@ def permutation_test(group_a, group_b, num_permutations=10000):
         perm_statistic = np.mean(perm_group_a) - np.mean(perm_group_b)
         permuted_statistics.append(perm_statistic)
 
+    print(np.sum(np.abs(permuted_statistics) >= np.abs(observed_statistic)))
     p_value = np.sum(np.abs(permuted_statistics) >= np.abs(observed_statistic)) / num_permutations
     return p_value
+
+
+# basic implementation for the Cohen's d effect size calculation.
+# Taken from the following article: https://www.askpython.com/python/examples/cohens-d-python
+def cohens_d(group1, group2):
+    mean1, mean2 = np.mean(group1), np.mean(group2)
+     
+    # pooled standard deviation
+    std1, std2 = np.std(group1, ddof=1), np.std(group2, ddof=1)
+    n1, n2 = len(group1), len(group2)
+    pooled_std = np.sqrt(((n1 - 1) * std1 ** 2 + (n2 - 1) * std2 ** 2) / (n1 + n2 - 2))
+     
+    # Final calculation
+    d = (mean1 - mean2) / pooled_std
+     
+    return d
 
 
 # function for visualizing rank-frequency distributions. Takes two lists of raw frequencies, one for each dataset. 

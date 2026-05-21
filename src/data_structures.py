@@ -86,6 +86,9 @@ class ComparisonConfig:
         # segmentation mode
         self.segmentation_mode = args["segmentation_mode"]
 
+        # randomized segmentation
+        self.random_segmentation = args["random_segmentation"]
+
         # length of segments that the treebank will be split into
         self.segment_length = args["segment_length"]
 
@@ -122,9 +125,12 @@ class ComparisonConfig:
             if lev not in ["bs", "ld", "tp", "sc", "nd", "sd", "full"]:
                 raise Exception("Only the following analysis level abbreviations are permitted: bs – basic level, ld – lexical diversity, tp – tag proportions, sc - syntactic complexity, nd – n-gram diversity, sd – syntactic diversity, full – full analysis")
             
-        # settings that aren't exposed publically (maybe add later as CLI arguments)
+        # settings that aren't exposed publicly (maybe add later as CLI arguments)
         self.export_bootstrapped = False
         self.export_rankfreq_plots = False
-        self.test_normality = False
-        self.significance_tests = False
-        self.effect_sizes = False
+        self.export_violin_plots = True
+        self.test_normality = True
+        self.significance_tests = True
+        self.effect_sizes = True
+        self.effect_size_ci = True
+        self.chisquare_residuals = True

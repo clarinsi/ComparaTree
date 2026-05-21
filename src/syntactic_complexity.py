@@ -7,7 +7,7 @@ from statistics import mean, stdev, median
 from math import log, sqrt, ceil
 
 from data_structures import ResultContainer, ComparisonConfig
-from general_utils import plot_histogram
+from general_utils import plot_histogram, draw_violinplot
 from stat_utils import return_bootstrapped
 
 
@@ -163,6 +163,10 @@ def export_syntactic_complexity_measure(first_segments: list, second_segments: l
     plot_histogram(sc_measurements["first_mdd"], sc_measurements["second_mdd"], "Mean Dependency Distance", cc, rc)
     
     plot_histogram(sc_measurements["first_ndd"], sc_measurements["second_ndd"], "Normalized Dependency Distance", cc, rc)
+
+    if cc.export_violin_plots:
+        draw_violinplot(sc_measurements["first_mdd"], sc_measurements["second_mdd"], "Mean Dependency Distance", cc, rc)
+        draw_violinplot(sc_measurements["first_ndd"], sc_measurements["second_ndd"], "Normalized Dependency Distance", cc, rc)
 
     # bootstrap visualizations
     if cc.export_bootstrapped:

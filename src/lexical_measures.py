@@ -3,7 +3,7 @@ from statistics import mean, stdev, median
 from collections import Counter
 
 from data_structures import ResultContainer, ComparisonConfig
-from general_utils import plot_histogram
+from general_utils import plot_histogram, draw_violinplot
 from stat_utils import draw_rankfreq, export_rankfreq_plots, return_bootstrapped
 
 
@@ -111,6 +111,9 @@ def export_lexical_diversity_measures(first_segments, second_segments, cc: Compa
 
         plot_histogram(f_ttr_l, s_ttr_l, "Type-Token Ratio", cc, rc, lim_one=True)
         #plot_histogram(f_mtld_l, s_mtld_l, "Measure of Textual Lexical Diversity", cc, rc)
+
+        if cc.export_violin_plots:
+            draw_violinplot(f_ttr_l, s_ttr_l, "Type-Token Ratio", cc, rc)
 
         # bootstrap visualizations
         if cc.export_bootstrapped:

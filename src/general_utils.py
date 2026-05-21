@@ -1,5 +1,5 @@
 from statistics import mean, stdev
-from scipy.stats import permutation_test
+from scipy.stats import permutation_test, ttest_ind, mannwhitneyu
 import seaborn as sns
 import numpy as np
 import pandas as pd
@@ -9,14 +9,11 @@ from tabulate import tabulate
 import conllu
 import os
 import logging
+import random
+import copy
 
 from data_structures import ResultContainer, ComparisonConfig
-from stat_utils import check_for_normality, return_bootstrapped
-
-
-# utility function to pass in to the function that performs the permutation test
-def mean_for_permutation(x, y):
-    return np.mean(x) - np.mean(y)
+from stat_utils import check_for_normality, return_bootstrapped, mean_for_permutation, cohens_d, return_bootstrapped_ci
 
 
 # parse conllu files
@@ -32,14 +29,31 @@ def parse_conllu(filepath):
 # 1. the "n" mode is the default mode. It splits the treebank into approximately equally sized segments of n tokens.
 # 2. the "doc_from_newdoc" mode splits the treebank into documents and tries to infer document boundaries from the "newdoc id" comment 
 # 3. the "doc_from_id" mode splits the treebank into documents and tries to infer document boundaries from the sentence id (the assumption is that sentence ids are of the format "doc3022.27.7", where "doc3022" denotes the document id).
-def split_into_segm(dataset, segmentation_mode, segment_length=1000):
+def split_into_segm(dataset, segmentation_mode, segment_length=1000, random_segmentation=False):
     assert segmentation_mode in ["n", "doc_from_newdoc", "doc_from_id"]
     segments = list()
 
-    if segmentation_mode == "n":
+    if segmentation_mode == "n" and not random_segmentation:
         curr_segment = list()
         i = 0
         for sent in dataset:
+            i += len(sent)
+            curr_segment.append(sent)
+            if i > segment_length:
+                segments.append(curr_segment)
+                curr_segment = list()
+                i = 0
+        
+        if len(curr_segment) > 0:
+            segments.append(curr_segment)
+    
+    elif segmentation_mode == "n" and random_segmentation:
+        shuffled_dataset = copy.deepcopy(dataset)
+        random.shuffle(shuffled_dataset)
+
+        curr_segment = list()
+        i = 0
+        for sent in shuffled_dataset:
             i += len(sent)
             curr_segment.append(sent)
             if i > segment_length:
@@ -107,67 +121,93 @@ def plot_histogram(first_data, second_data, measure, cc: ComparisonConfig, rc: R
     segmentation_mode = cc.segmentation_mode
     test_normality = cc.test_normality
     significance_tests = cc.significance_tests
+    effect_sizes = cc.effect_sizes
+    effect_size_ci = cc.effect_size_ci
+
+    text_xpos = 0.95
+    text_ha = "right"
+    """
+    if measure.endswith("Gram Diversity Score"):
+        text_xpos = 0.05
+        text_ha = "left
+    """
 
     # manually set matplotlib's logging level due to some strange debug messages
     plt.set_loglevel("warning")
     logging.getLogger('PIL').setLevel(logging.WARNING)
+    sns.set_style("whitegrid")
 
     print(f"Plotting {measure} histogram")
-    first_mean = mean([x for x in first_data if x is not np.nan])
-    second_mean = mean([x for x in second_data if x is not np.nan])
-    first_stdev = np.std([x for x in first_data if x is not np.nan]) if len(first_data) > 1 else None
-    second_stdev = np.std([x for x in second_data if x is not np.nan]) if len(second_data) > 1 else None
+    first_mean = mean([x for x in first_data if not np.isnan(x)])
+    second_mean = mean([x for x in second_data if not np.isnan(x)])
+    first_stdev = np.std([x for x in first_data if not np.isnan(x)]) if len(first_data) > 1 else None
+    second_stdev = np.std([x for x in second_data if not np.isnan(x)]) if len(second_data) > 1 else None
 
     # hypothesis testing
     if test_normality:
-        shapiro_pvalue_first = check_for_normality([x for x in first_data if x is not np.nan])[1]
-        shapiro_pvalue_second = check_for_normality([x for x in second_data if x is not np.nan])[1]
+        shapiro_pvalue_first = check_for_normality([x for x in first_data if not np.isnan(x)])[1]
+        shapiro_pvalue_second = check_for_normality([x for x in second_data if not np.isnan(x)])[1]
 
-    permutation_text = ""
+    significance_text = ""
     if significance_tests:
-        permutation_pvalue = permutation_test(([x for x in first_data if x is not np.nan], [x for x in second_data if x is not np.nan]), mean_for_permutation).pvalue
-        permutation_text = f"Permutation test p value: {permutation_pvalue}"
+        #permutation_result = permutation_test(([x for x in first_data if not np.isnan(x)], [x for x in second_data if not np.isnan(x)]), statistic=mean_for_permutation, vectorized=True, axis=0)
+        #permutation_pvalue = permutation_result.pvalue
+        ttest_pvalue = ttest_ind([x for x in first_data if not np.isnan(x)], [x for x in second_data if not np.isnan(x)]).pvalue
+        mwu_pvalue = mannwhitneyu([x for x in first_data if not np.isnan(x)], [x for x in second_data if not np.isnan(x)]).pvalue
+        significance_text = f" T-test test p value: {ttest_pvalue}. Mann-Whitney U p value: {mwu_pvalue}."
+    
+    effect_size_text = ""
+    if effect_sizes:
+        cohen_size = cohens_d([x for x in first_data if not np.isnan(x)], [x for x in second_data if not np.isnan(x)])
+        effect_size_text = f" Cohen's d: {cohen_size}"
+        
+        if effect_size_ci:
+            ci_low, ci_high = return_bootstrapped_ci([x for x in first_data if not np.isnan(x)], [x for x in second_data if not np.isnan(x)], cohens_d)
+            effect_size_text += f" CI low: {ci_low}, CI high: {ci_high}"
 
     # make histograms
-    fig, axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
+    fig, axes = plt.subplots(2, 1, figsize=(12, 6), sharex=True)
+    label_fontsize = 18
 
     # Plot the first histogram
-    sns.histplot(first_data, kde=False, ax=axes[0])
-    axes[0].set_title(f"Treebank={rc.dataset_names[0]}")
+    #sns.set_theme(rc={'axes.facecolor':"#FFFFFF", 'figure.facecolor':(0,0,0,0)}) # transparent background
+    sns.histplot(first_data, kde=False, ax=axes[0], color="#60B524")
+    axes[0].set_title(f"Treebank={rc.dataset_names[0]}", fontsize=label_fontsize)
     axes[0].set(xlabel=f"Range of values for {measure}")
     if lim_one:
         axes[0].set_xlim(0, 1)
     axes[0].axvline(x=first_mean, color='red', linestyle='-', linewidth=2)
-    axes[0].text(0.95, 0.95,  f"Mean = {first_mean:.3f}", color='red', fontsize=14, ha='right', va='top',
+    axes[0].text(text_xpos, 0.95,  f"Mean = {first_mean:.3f}", color='black', fontsize=label_fontsize, ha=text_ha, va='top',
                  transform=axes[0].transAxes)
     if first_stdev:
-        axes[0].text(0.95, 0.80, f"Standard deviation = {first_stdev:.3f}", color='orange', fontsize=14, ha='right',
+        axes[0].text(text_xpos, 0.80, f"Standard deviation = {first_stdev:.3f}", color='black', fontsize=label_fontsize, ha=text_ha,
                      va='top', transform=axes[0].transAxes)
     else:
-        axes[0].text(0.95, 0.80, f"Standard deviation = N/A", color='orange', fontsize=14, ha='right',
+        axes[0].text(text_xpos, 0.80, f"Standard deviation = N/A", color='orange', fontsize=label_fontsize, ha=text_ha,
                      va='top', transform=axes[0].transAxes)
     if test_normality:
-        axes[0].text(0.95, 0.65, f"Shapiro-Wilk p = {shapiro_pvalue_first}", color='purple', fontsize=14, ha='right',
+        axes[0].text(text_xpos, 0.65, f"Shapiro-Wilk p = {shapiro_pvalue_first}", color='purple', fontsize=label_fontsize, ha=text_ha,
                      va='top', transform=axes[0].transAxes)
 
     # Plot the second histogram
-    sns.histplot(second_data, kde=False, ax=axes[1])
-    axes[1].set_title(f"Treebank={rc.dataset_names[1]}")
+    #sns.set_theme(rc={'axes.facecolor':"#FFFFFF", 'figure.facecolor':(0,0,0,0)}) # transparent background
+    sns.histplot(second_data, kde=False, ax=axes[1], color="#2D95D6")
+    axes[1].set_title(f"Treebank={rc.dataset_names[1]}", fontsize=label_fontsize)
     axes[1].set(xlabel=f"Range of values for {measure}")
     if lim_one:
         axes[1].set_xlim(0, 1)
     axes[1].axvline(x=second_mean, color='red', linestyle='-', linewidth=2)
-    axes[1].text(0.95, 0.95, f"Mean = {second_mean:.3f}", color='red', fontsize=14, ha='right', va='top',
+    axes[1].text(text_xpos, 0.95, f"Mean = {second_mean:.3f}", color='black', fontsize=label_fontsize, ha=text_ha, va='top',
                  transform=axes[1].transAxes)
     if second_stdev:
-        axes[1].text(0.95, 0.80, f"Standard deviation = {second_stdev:.3f}", color='orange', fontsize=14, ha='right',
+        axes[1].text(text_xpos, 0.80, f"Standard deviation = {second_stdev:.3f}", color='black', fontsize=label_fontsize, ha=text_ha,
                      va='top', transform=axes[1].transAxes)
     else:
-        axes[1].text(0.95, 0.80, f"Standard deviation = N/A", color='orange', fontsize=14, ha='right',
+        axes[1].text(text_xpos, 0.80, f"Standard deviation = N/A", color='orange', fontsize=label_fontsize, ha=text_ha,
                      va='top', transform=axes[1].transAxes)
     if test_normality:
-        axes[1].text(0.95, 0.65, f"Shapiro-Wilk p = {shapiro_pvalue_second}", color='purple', 
-                     fontsize=14, ha='right', va='top', transform=axes[1].transAxes)
+        axes[1].text(text_xpos, 0.65, f"Shapiro-Wilk p = {shapiro_pvalue_second}", color='purple', fontsize=label_fontsize, 
+                     ha=text_ha, va='top', transform=axes[1].transAxes)
 
     # handle segmentation mode wording
     if segmentation_mode == "n":
@@ -182,14 +222,46 @@ def plot_histogram(first_data, second_data, measure, cc: ComparisonConfig, rc: R
     fig.suptitle(f"{segmentation_mode_wording} {measure} Histogram")
 
     plt.tight_layout()
-    fig.subplots_adjust(bottom=0.14)
+    fig.subplots_adjust(bottom=0.18)
     caption = (r"$\bf{Figure:}$" + f"Histogram showing the frequency distribution for the {segmentation_mode_wording.lower()} "
                 f"{measure} in both treebanks. The x axis represents the range of values for the {measure}. "
                 f"The blue bars represent the number of observations for each value "
-                f"of the measure. The red vertical line represents the mean of the {measure}. {permutation_text}")
+                f"of the measure. The red vertical line represents the mean of the {measure}.{significance_text}{effect_size_text}")
     fig.text(0, 0.01, caption, wrap=True, fontsize=10)
 
     plt.savefig(f"{output_dir}/{measure}_histogram.png")
+    plt.savefig(f"{output_dir}/{measure}_histogram.svg")
+
+    plt.clf()
+
+
+# function for drawing violin plots
+def draw_violinplot(first_data, second_data, measure, cc:ComparisonConfig, rc:ResultContainer):
+    # manually set matplotlib's logging level due to some strange debug messages
+    plt.set_loglevel("warning")
+    logging.getLogger('PIL').setLevel(logging.WARNING)
+    sns.set_style("whitegrid")
+
+    first_name = cc.first_dataset_name
+    second_name = cc.second_dataset_name
+    output_dir = cc.output_dir
+
+    font_size = 26
+
+    violin_df = pd.DataFrame({measure: first_data + second_data,
+                              "Dataset": [first_name] * len(first_data) + [second_name] * len(second_data)})
+
+    vp1 = sns.violinplot(x="Dataset", y=measure, data=violin_df, palette="crest_r")
+    vp1.set(ylabel=None)
+
+    plt.title(f"{measure} Violin Plot", fontsize=font_size)
+    plt.xlabel("Dataset", fontsize=font_size)
+    plt.xticks(fontsize=font_size)
+    plt.yticks(fontsize=font_size)
+
+    plt.savefig(f"{output_dir}/{measure}_violinplot.png")
+
+    plt.clf()
 
 
 # general function for drawing stripplots
@@ -318,12 +390,18 @@ def basic_stats_segments(first_segments, second_segments, cc: ComparisonConfig, 
     # since segment length is obvious in that case
     if segmentation_mode != "n":
         plot_histogram(first_overall_seg_lengths, second_overall_seg_lengths, "Segment Length", cc, rc)
+        
+        if cc.export_violin_plots:
+            draw_violinplot(first_overall_seg_lengths, second_overall_seg_lengths, "Segment Length", cc, rc)
 
     # segment level visualization of mean sentence length
     #plot_histogram(first_seg_mean_words, second_seg_mean_words, "Average Sentence Length", output_dir, rc, segmentation_mode=segmentation_mode)
 
     # sentence level visualization of mean sentence length
     plot_histogram(first_wps, second_wps, "Average Sentence Length", cc, rc)
+    
+    if cc.export_violin_plots:
+            draw_violinplot(first_wps, second_wps, "Average Sentence Length", cc, rc)
 
     # bootstrap visualizations
     if cc.export_bootstrapped:

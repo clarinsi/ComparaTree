@@ -14,7 +14,7 @@ from stark.stark import run as stark_run
 from stark.stark import read_configs as stark_read_configs
 
 from data_structures import ResultContainer, ComparisonConfig
-from general_utils import plot_histogram
+from general_utils import plot_histogram, draw_violinplot
 from stat_utils import draw_rankfreq, export_rankfreq_plots, return_bootstrapped
 
 
@@ -180,6 +180,9 @@ def get_tree_diversity(first_segments, second_segments, cc: ComparisonConfig, rc
     rc.stdev_tree_diversity_score = [first_stdev, second_stdev]
 
     plot_histogram(first_tds_list, second_tds_list, "Tree Diversity Score", cc, rc)
+
+    if cc.export_violin_plots:
+        draw_violinplot(first_tds_list, second_tds_list, "Tree Diversity Score", cc, rc)
 
     # bootstrap visualizations
     if cc.export_bootstrapped:
